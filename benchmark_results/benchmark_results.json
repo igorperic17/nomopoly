@@ -1,14 +1,14 @@
 {
   "device": "cpu",
   "test_samples": 1000,
-  "timestamp": "2025-06-21 08:50:04",
+  "timestamp": "2025-06-21 08:51:21",
   "classification": {
-    "overall_accuracy": 0.948,
-    "average_confidence": "0.9716154",
+    "overall_accuracy": 0.946,
+    "average_confidence": "0.9713827",
     "digit_0": 0.9904761904761905,
     "digit_1": 0.9819819819819819,
-    "digit_2": 0.9473684210526315,
-    "digit_3": 0.908256880733945,
+    "digit_2": 0.9385964912280702,
+    "digit_3": 0.8990825688073395,
     "digit_4": 0.9696969696969697,
     "digit_5": 0.9347826086956522,
     "digit_6": 0.9595959595959596,
@@ -17,18 +17,18 @@
     "digit_9": 0.9775280898876404
   },
   "verification": {
-    "real_proof_acceptance_rate": "0.694",
-    "fake_proof_acceptance_rate": "0.05",
-    "verifier_discrimination_accuracy": "0.822",
-    "real_avg_confidence": 0.5030763149261475,
-    "fake_avg_confidence": 0.49441254138946533
+    "real_proof_acceptance_rate": "0.644",
+    "fake_proof_acceptance_rate": "0.814",
+    "verifier_discrimination_accuracy": "0.415",
+    "real_avg_confidence": 0.5030275583267212,
+    "fake_avg_confidence": 0.502755343914032
   },
   "performance": {
-    "prover_inference_time_ms": 0.05388975143432617,
-    "verifier_inference_time_ms": 0.04546642303466797,
-    "adversary_inference_time_ms": 0.07279157638549805,
-    "total_proof_generation_time_ms": 0.05388975143432617,
-    "total_verification_time_ms": 0.04546642303466797
+    "prover_inference_time_ms": 0.053200721740722656,
+    "verifier_inference_time_ms": 0.0475001335144043,
+    "adversary_inference_time_ms": 0.0738382339477539,
+    "total_proof_generation_time_ms": 0.053200721740722656,
+    "total_verification_time_ms": 0.0475001335144043
   },
   "complexity": {
     "prover_parameters": 110090,
@@ -41,8 +41,8 @@
     "total_memory_mb": 1.5501289367675781
   },
   "robustness": {
-    "adversarial_robustness": 0.8399999737739563,
-    "average_confidence_change": 0.07938866317272186,
+    "adversarial_robustness": 0.8500000238418579,
+    "average_confidence_change": 0.07695061713457108,
     "perturbation_epsilon": 0.1
   }
 }
