@@ -2,10 +2,10 @@
 """
 ZK-ML Demo: Holographic Reduced Representations with Fixed-Size Proofs
 
-This demo showcases the zkGAP-inspired approach:
+This demo showcases the GAN-inspired approach:
 1. Fixed-size proofs using Holographic Reduced Representations (HRR)
 2. Circular convolution for binding activations with positions
-3. zkGAP-style adversarial training methodology
+3. GAN-style adversarial training methodology
 4. Verifier learning to distinguish real from fake proofs
 """
 
@@ -101,10 +101,10 @@ def test_hrr_components():
     print(f"   Circular convolution result: {tuple(result.shape)}")
     print(f"✅ Circular convolution working correctly!")
 
-def run_zkgap_training():
-    """Run zkGAP-inspired adversarial training."""
+def run_gan_training():
+    """Run GAN-inspired adversarial training."""
     print("\n" + "=" * 70)
-    print("🥊 zkGAP-INSPIRED ADVERSARIAL TRAINING")
+    print("🥊 GAN-INSPIRED ADVERSARIAL TRAINING")
     print("=" * 70)
     
     # Network dimensions
@@ -122,13 +122,13 @@ def run_zkgap_training():
     verifier_params = sum(p.numel() for p in verifier_net.parameters()) if hasattr(verifier_net, 'layers') and verifier_net.layers else 0
     malicious_params = sum(p.numel() for p in malicious_net.parameters())
     
-    print(f"🎯 zkGAP Training Setup:")
+    print(f"🎯 GAN Training Setup:")
     print(f"   Inference Network: {inference_params:,} parameters")
     print(f"   Verifier Network: Dynamic layers (built during training)")
     print(f"   Malicious Network: {malicious_params:,} parameters")
     print(f"   Proof Size: [batch, {proof_dim}] (FIXED regardless of network size!)")
     
-    print(f"\n📋 Training Methodology (zkGAP-inspired):")
+    print(f"\n📋 Training Methodology (GAN-inspired):")
     print(f"   1. Verifier learns to distinguish real from fake proofs")
     print(f"   2. Malicious network tries to fool verifier")
     print(f"   3. Inference network generates authentic proofs")
@@ -144,7 +144,7 @@ def run_zkgap_training():
     )
     
     # Train system
-    print(f"\n🚀 Starting zkGAP-style adversarial training...")
+    print(f"\n🚀 Starting GAN-style adversarial training...")
     stats = trainer.train(num_epochs=50, num_samples=3000)
     
     # Create comprehensive plots
@@ -178,7 +178,7 @@ def demonstrate_live_verification(trainer):
 def main():
     """Main demo function."""
     print("🚀 ZK-ML with Holographic Reduced Representations Demo")
-    print("Showcasing zkGAP-inspired fixed-size proof generation")
+    print("Showcasing GAN-inspired fixed-size proof generation")
     
     # Clear previous results
     clear_previous_results()
@@ -189,8 +189,11 @@ def main():
     # Step 2: Test HRR components
     test_hrr_components()
     
-    # Step 3: zkGAP-style adversarial training
-    trainer, stats = run_zkgap_training()
+    # Step 3: GAN-style adversarial training
+    trainer, stats = run_gan_training()
+    
+    # Models are automatically saved by the trainer during training
+    print("💾 Models automatically saved to models/ directory")
     
     # Step 4: Live verification demo
     demonstrate_live_verification(trainer)
@@ -204,7 +207,7 @@ def main():
     
     # Final analysis
     final_stats = stats
-    final_verifier_acc = final_stats["binary_accuracy"][-1]
+    final_verifier_acc = final_stats["overall_accuracy"][-1]
     final_malicious_success = final_stats["malicious_success"][-1]
     final_score_gap = final_stats["score_separation"][-1]
     
@@ -212,7 +215,7 @@ def main():
     if final_verifier_acc > 0.8 and final_malicious_success < 0.3 and final_score_gap > 0.2:
         print("🎉 EXCELLENT: HRR system successfully learned to generate and verify proofs!")
         print("   Fixed-size proofs working with high verifier accuracy")
-        print("   zkGAP-inspired training methodology successful")
+        print("   GAN-inspired training methodology successful")
     elif final_verifier_acc > 0.65 or final_score_gap > 0.1:
         print("⚠️ PARTIAL SUCCESS: HRR system shows promise")
         print("   Some proof learning achieved, may need hyperparameter tuning")
@@ -224,7 +227,7 @@ def main():
     print(f"   ✓ Fixed-size proofs regardless of network complexity")
     print(f"   ✓ Circular convolution for binding activations")
     print(f"   ✓ Superposition memory with exponential decay")
-    print(f"   ✓ zkGAP-inspired adversarial training methodology")
+    print(f"   ✓ GAN-inspired adversarial training methodology")
     print(f"   ✓ Hook-free direct integration architecture")
 
 if __name__ == "__main__":

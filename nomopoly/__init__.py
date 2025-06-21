@@ -2,7 +2,7 @@
 Nomopoly: Zero Knowledge Machine Learning Framework with Holographic Reduced Representations
 
 A framework for training neural networks with zero-knowledge proof capabilities,
-featuring fixed-size proofs using HRR and zkGAP-inspired adversarial training.
+featuring fixed-size proofs using HRR and GAN-inspired adversarial training.
 """
 
 from .networks import (

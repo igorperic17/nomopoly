@@ -2,7 +2,7 @@
 Core neural network architectures for Zero Knowledge ML using Holographic Reduced Representations.
 
 This module implements the HRR-based approach for fixed-size proof generation
-regardless of network complexity, inspired by zkGAP's breakthrough methodology.
+regardless of network complexity, inspired by GAN's breakthrough methodology.
 """
 
 import torch

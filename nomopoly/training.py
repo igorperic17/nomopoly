@@ -359,7 +359,114 @@ class ZKTrainer:
         else:
             print("❌ NO SEPARATION: Verifier cannot distinguish proof types")
         
+        # Save trained models
+        self.save_trained_models()
+        
         return stats
+    
+    def save_trained_models(self, models_dir: str = "models") -> Dict[str, str]:
+        """
+        Save trained model states to disk.
+        
+        Args:
+            models_dir: Directory to save models
+            
+        Returns:
+            Dictionary with paths to saved models
+        """
+        import os
+        
+        # Create models directory
+        os.makedirs(models_dir, exist_ok=True)
+        
+        model_paths = {}
+        
+        # Save inference network (prover)
+        prover_path = os.path.join(models_dir, "zk_prover_net.pth")
+        torch.save({
+            'model_state_dict': self.inference_net.state_dict(),
+            'model_config': {
+                'input_dim': self.inference_net.input_dim,
+                'output_dim': self.inference_net.output_dim,
+                'proof_dim': self.inference_net.proof_dim
+            }
+        }, prover_path)
+        model_paths['prover'] = prover_path
+        
+        # Save verifier network
+        verifier_path = os.path.join(models_dir, "zk_verifier_net.pth")
+        if hasattr(self.verifier_net, 'layers') and self.verifier_net.layers:
+            torch.save({
+                'model_state_dict': self.verifier_net.state_dict(),
+                'model_config': {
+                    'input_dim': self.verifier_net.input_dim,
+                    'output_dim': self.verifier_net.output_dim,
+                    'proof_dim': self.verifier_net.proof_dim
+                }
+            }, verifier_path)
+            model_paths['verifier'] = verifier_path
+        
+        # Save adversary network
+        adversary_path = os.path.join(models_dir, "zk_adversary_net.pth")
+        torch.save({
+            'model_state_dict': self.malicious_net.state_dict(),
+            'model_config': {
+                'input_dim': self.malicious_net.input_dim,
+                'output_dim': self.malicious_net.output_dim,
+                'proof_dim': self.malicious_net.proof_dim
+            }
+        }, adversary_path)
+        model_paths['adversary'] = adversary_path
+        
+        print(f"💾 Trained models saved to {models_dir}/:")
+        for model_type, path in model_paths.items():
+            print(f"   {model_type.capitalize()}: {path}")
+        
+        return model_paths
+    
+    def load_trained_models(self, models_dir: str = "models") -> bool:
+        """
+        Load trained model states from disk.
+        
+        Args:
+            models_dir: Directory containing saved models
+            
+        Returns:
+            True if all models loaded successfully
+        """
+        import os
+        
+        try:
+            # Load prover network
+            prover_path = os.path.join(models_dir, "zk_prover_net.pth")
+            if os.path.exists(prover_path):
+                checkpoint = torch.load(prover_path, map_location=self.device)
+                self.inference_net.load_state_dict(checkpoint['model_state_dict'])
+                print(f"✅ Loaded prover from {prover_path}")
+            
+            # Load verifier network
+            verifier_path = os.path.join(models_dir, "zk_verifier_net.pth")
+            if os.path.exists(verifier_path):
+                checkpoint = torch.load(verifier_path, map_location=self.device)
+                # Build verifier layers if not already built
+                if not hasattr(self.verifier_net, 'layers') or not self.verifier_net.layers:
+                    config = checkpoint['model_config']
+                    self.verifier_net._build_layers(config['input_dim'], config['output_dim'], config['proof_dim'])
+                self.verifier_net.load_state_dict(checkpoint['model_state_dict'])
+                print(f"✅ Loaded verifier from {verifier_path}")
+            
+            # Load adversary network
+            adversary_path = os.path.join(models_dir, "zk_adversary_net.pth")
+            if os.path.exists(adversary_path):
+                checkpoint = torch.load(adversary_path, map_location=self.device)
+                self.malicious_net.load_state_dict(checkpoint['model_state_dict'])
+                print(f"✅ Loaded adversary from {adversary_path}")
+            
+            return True
+            
+        except Exception as e:
+            print(f"❌ Error loading models: {e}")
+            return False
         
     def create_training_plots(self, stats: Dict[str, List[float]]) -> List[str]:
         """

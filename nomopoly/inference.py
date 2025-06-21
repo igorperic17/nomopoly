@@ -396,7 +396,43 @@ def run_inference_analysis(
     # Initialize inference engine
     inference_engine = ZKInference(prover, verifier, adversary, device)
     
-    # Run sample demo
-    inference_engine.run_sample_verification_demo(10)
+    # Load test data
+    test_loader = inference_engine.load_test_data(num_test_samples)
     
-    return {"status": "completed"} 
+    # Run comprehensive verification analysis
+    verification_results = inference_engine.run_comprehensive_verification(test_loader)
+    
+    # Run robustness analysis
+    robustness_results = inference_engine.analyze_verification_robustness(test_loader, num_samples=100)
+    
+    # Run sample demo
+    print("\n" + "=" * 60)
+    print("🎭 SAMPLE VERIFICATION DEMO")
+    print("=" * 60)
+    inference_engine.run_sample_verification_demo(12)
+    
+    # Compile comprehensive results
+    complete_results = {
+        'verification_analysis': verification_results,
+        'robustness_analysis': robustness_results,
+        'summary_metrics': {
+            'overall_verification_accuracy': verification_results['metrics']['overall_verification_accuracy'],
+            'classification_accuracy': verification_results['metrics']['classification_accuracy'],
+            'score_separation': verification_results['metrics']['score_separation'],
+            'real_real_accuracy': verification_results['metrics']['real_real_accuracy'],
+            'fake_rejection_rate': (
+                verification_results['metrics']['fake_fake_accuracy'] +
+                verification_results['metrics']['fake_real_accuracy'] + 
+                verification_results['metrics']['real_wrong_accuracy']
+            ) / 3
+        }
+    }
+    
+    print(f"\n📊 INFERENCE ANALYSIS SUMMARY:")
+    print(f"   Overall Verification Accuracy: {complete_results['summary_metrics']['overall_verification_accuracy']:.1%}")
+    print(f"   Classification Accuracy: {complete_results['summary_metrics']['classification_accuracy']:.1%}")
+    print(f"   Score Separation: {complete_results['summary_metrics']['score_separation']:.3f}")
+    print(f"   Real Proof Acceptance: {complete_results['summary_metrics']['real_real_accuracy']:.1%}")
+    print(f"   Fake Proof Rejection: {complete_results['summary_metrics']['fake_rejection_rate']:.1%}")
+    
+    return complete_results 
