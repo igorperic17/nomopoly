@@ -43,8 +43,8 @@ def main():
     
     # Configuration
     config = {
-        "input_dim": 2,
-        "output_dim": 1,
+        "input_dim": 196,  # 14x14 flattened image
+        "output_dim": 10,  # 10 digit classes
         "proof_dim": 64,
         "num_epochs": 50,
         "num_samples": 5000,
@@ -55,9 +55,9 @@ def main():
     print(f"Configuration: {config}")
     print()
     
-    # Step 1: Create simple ONNX graph
-    print("📊 Step 1: Creating simple ONNX computation graph...")
-    onnx_path = create_simple_onnx_graph("models/simple_sum.onnx")
+    # Step 1: Create MNIST ONNX graph
+    print("📊 Step 1: Creating MNIST classification ONNX graph...")
+    onnx_path = create_simple_onnx_graph("models/mnist_classifier.onnx")
     
     # Verify the ONNX model works (skip verification to avoid compatibility issues)
     print("✅ ONNX model created (skipping verification due to version compatibility)")
@@ -125,8 +125,8 @@ def main():
     # Step 4: Evaluate and benchmark
     print("📈 Step 4: Evaluating and benchmarking...")
     
-    # Create test data
-    test_data = torch.FloatTensor(config["test_samples"], config["input_dim"]).uniform_(-10.0, 10.0)
+    # Create test data (normalized image data)
+    test_data = torch.FloatTensor(config["test_samples"], config["input_dim"]).uniform_(0.0, 1.0)
     
     # Initialize benchmark
     benchmark = ZKMLBenchmark(
@@ -195,40 +195,40 @@ def demonstrate_system(prover, verifier, adversary, device):
     verifier.eval()
     adversary.eval()
     
-    # Test cases
+    # Generate test cases (random image-like data)
     test_cases = [
-        [2.0, 3.0],   # Expected: 5.0
-        [7.0, -2.0],  # Expected: 5.0
-        [0.0, 10.0],  # Expected: 10.0
-        [-5.0, -3.0]  # Expected: -8.0
+        torch.rand(196) * 0.8 + 0.1,  # Random image 1
+        torch.rand(196) * 0.6 + 0.2,  # Random image 2  
+        torch.rand(196) * 0.9,        # Random image 3
+        torch.rand(196) * 0.7 + 0.3   # Random image 4
     ]
     
     with torch.no_grad():
         for i, inputs in enumerate(test_cases):
-            print(f"\nTest Case {i+1}: {inputs}")
+            print(f"\nTest Case {i+1}: Random 14x14 image")
             
-            # Convert to tensor
-            x = torch.FloatTensor([inputs]).to(device)
+            # Convert to tensor and add batch dimension
+            x = inputs.unsqueeze(0).to(device)
             
-            # Ground truth
-            ground_truth = sum(inputs)
-            
-            # Prover computation and proof
-            prover_output, proof = prover(x)
-            prover_result = prover_output.item()
+            # Prover generates classification and proof
+            log_probs, proof = prover(x)
+            probs = torch.exp(log_probs)
+            predicted_class = torch.argmax(probs, dim=1).item()
+            confidence = torch.max(probs, dim=1)[0].item()
             
             # Verifier check
-            verification_score = verifier(x, prover_output, proof).item()
+            verification_score = verifier(x, log_probs, proof).item()
             
-            # Adversary attempt
-            fake_output, fake_proof = adversary(x)
-            fake_result = fake_output.item()
-            fake_verification = verifier(x, fake_output, fake_proof).item()
+            # Adversary generates fake classification
+            fake_log_probs, fake_proof = adversary(x)
+            fake_probs = torch.exp(fake_log_probs)
+            fake_predicted_class = torch.argmax(fake_probs, dim=1).item()
+            fake_confidence = torch.max(fake_probs, dim=1)[0].item()
+            fake_verification = verifier(x, fake_log_probs, fake_proof).item()
             
-            print(f"  Ground Truth: {ground_truth:.4f}")
-            print(f"  Prover Result: {prover_result:.4f} (Error: {abs(prover_result - ground_truth):.6f})")
+            print(f"  Prover Classification: Digit {predicted_class} (Confidence: {confidence:.4f})")
             print(f"  Proof Verification: {verification_score:.4f} {'✅' if verification_score > 0.5 else '❌'}")
-            print(f"  Adversary Fake: {fake_result:.4f}")
+            print(f"  Adversary Fake: Digit {fake_predicted_class} (Confidence: {fake_confidence:.4f})")
             print(f"  Fake Verification: {fake_verification:.4f} {'🚨 FOOLED!' if fake_verification > 0.5 else '✅ DETECTED'}")
 
 

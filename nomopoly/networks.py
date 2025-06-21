@@ -38,13 +38,19 @@ class ZKProverNet(nn.Module):
         self.output_dim = output_dim
         self.proof_dim = proof_dim
         
-        # Original computation (e.g., sum of two numbers)
+        # Original computation (e.g., MNIST classification)
         if original_computation is None:
-            # Default: simple sum operation
-            self.original_computation = nn.Linear(input_dim, output_dim, bias=False)
-            # Initialize weights to [1, 1] for sum operation
-            with torch.no_grad():
-                self.original_computation.weight.fill_(1.0)
+            # Default: simple MNIST classifier
+            self.original_computation = nn.Sequential(
+                nn.Linear(input_dim, 128),
+                nn.ReLU(),
+                nn.Dropout(0.2),
+                nn.Linear(128, 64),
+                nn.ReLU(),
+                nn.Dropout(0.2),
+                nn.Linear(64, output_dim),
+                nn.LogSoftmax(dim=-1)  # Log probabilities for classification
+            )
         else:
             self.original_computation = original_computation
             
@@ -189,6 +195,7 @@ class ZKAdversarialNet(nn.Module):
             prev_dim = hidden_dim
             
         output_layers.append(nn.Linear(prev_dim, output_dim))
+        output_layers.append(nn.LogSoftmax(dim=-1))  # Log probabilities for classification
         self.fake_output_generator = nn.Sequential(*output_layers)
         
         # Fake proof generator

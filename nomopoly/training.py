@@ -4,6 +4,7 @@ Auto ZK Training pipeline for joint adversarial training of the three networks.
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 from torch.utils.tensorboard import SummaryWriter
@@ -70,11 +71,11 @@ class AutoZKTraining:
     def generate_training_data(
         self, 
         num_samples: int = 10000,
-        input_range: Tuple[float, float] = (-10.0, 10.0)
+        input_range: Tuple[float, float] = (0.0, 1.0)
     ) -> DataLoader:
-        """Generate training data for the simple sum operation."""
-        # Generate random inputs (2D for sum operation)
-        inputs = torch.FloatTensor(num_samples, 2).uniform_(*input_range)
+        """Generate training data for the MNIST classification."""
+        # Generate random inputs (flattened image data)
+        inputs = torch.FloatTensor(num_samples, self.prover.input_dim).uniform_(*input_range)
         
         # Create dataset and dataloader
         dataset = TensorDataset(inputs)
@@ -128,24 +129,24 @@ class AutoZKTraining:
         batch_size = batch.size(0)
         
         # Generate outputs and proofs
-        outputs, proofs = self.prover(batch)
+        log_probs, proofs = self.prover(batch)
         
-        # Compute correct outputs for comparison
-        correct_outputs = torch.sum(batch, dim=1, keepdim=True)
+        # Generate synthetic classification labels (random for training)
+        correct_labels = torch.randint(0, 10, (batch_size,), device=self.device)
         
         # Verifier should classify these as real (label = 1)
         real_labels = torch.ones(batch_size, 1, device=self.device)
-        verifier_predictions = self.verifier(batch, outputs, proofs)
+        verifier_predictions = self.verifier(batch, log_probs, proofs)
         
         # Loss components:
-        # 1. Computation accuracy (prover should compute correctly)
-        computation_loss = self.mse_loss(outputs, correct_outputs)
+        # 1. Classification accuracy (negative log-likelihood)
+        classification_loss = F.nll_loss(log_probs, correct_labels)
         
         # 2. Proof validity (verifier should accept the proof)
         proof_loss = self.bce_loss(verifier_predictions, real_labels)
         
         # Combined loss
-        total_loss = computation_loss + proof_loss
+        total_loss = classification_loss + proof_loss
         
         # Backward pass
         self.prover_optimizer.zero_grad()
@@ -283,13 +284,13 @@ class AutoZKTraining:
         torch.save(self.adversary.state_dict(), 
                   os.path.join(save_dir, f"adversary_epoch_{epoch}.pth"))
                   
-    def save_models_as_onnx(self, save_dir: str, input_shape: Tuple[int, ...] = (1, 2)):
+    def save_models_as_onnx(self, save_dir: str, input_shape: Tuple[int, ...] = (1, 196)):
         """Save prover and verifier as ONNX models for deployment."""
         os.makedirs(save_dir, exist_ok=True)
         
         # Create dummy inputs
         dummy_input = torch.randn(input_shape, device=self.device)
-        dummy_output = torch.randn((input_shape[0], 1), device=self.device)
+        dummy_output = torch.randn((input_shape[0], 10), device=self.device)  # 10 classes
         dummy_proof = torch.randn((input_shape[0], self.prover.proof_dim), device=self.device)
         
         # Export prover

@@ -16,47 +16,95 @@ import os
 
 
 def create_simple_onnx_graph(
-    save_path: str = "simple_sum.onnx",
-    input_shape: Tuple[int, ...] = (2,)
+    save_path: str = "mnist_classifier.onnx",
+    input_shape: Tuple[int, ...] = (196,)  # 14x14 flattened
 ) -> str:
     """
-    Create a simple ONNX graph that computes the sum of two numbers.
+    Create a simple ONNX graph that performs MNIST digit classification.
     
-    This creates the simplest possible ONNX computation graph for our PoC.
+    Takes a flattened 14x14 grayscale image and outputs 10 class probabilities.
     
     Args:
         save_path: Path to save the ONNX model
-        input_shape: Shape of the input tensor
+        input_shape: Shape of the input tensor (flattened image)
         
     Returns:
         Path to the saved ONNX model
     """
     
-    # Define the inputs
+    # Define input (flattened 14x14 image)
     input_tensor = helper.make_tensor_value_info(
         'input', TensorProto.FLOAT, input_shape
     )
     
-    # Define the output
+    # Define output (10 class probabilities)
     output_tensor = helper.make_tensor_value_info(
-        'output', TensorProto.FLOAT, (1,)
+        'output', TensorProto.FLOAT, (10,)
     )
     
-    # Create a ReduceSum node to sum all elements
-    reduce_sum_node = helper.make_node(
-        'ReduceSum',
-        inputs=['input'],
-        outputs=['output'],
-        axes=[0],  # Sum across the first dimension
-        keepdims=0  # Don't keep dimensions
+    # Create weight matrices for a simple 2-layer network
+    # Hidden layer: 196 -> 64
+    W1_data = np.random.randn(input_shape[0], 64).astype(np.float32) * 0.1
+    W1_tensor = numpy_helper.from_array(W1_data, name='W1')
+    
+    b1_data = np.zeros(64, dtype=np.float32)
+    b1_tensor = numpy_helper.from_array(b1_data, name='b1')
+    
+    # Output layer: 64 -> 10
+    W2_data = np.random.randn(64, 10).astype(np.float32) * 0.1
+    W2_tensor = numpy_helper.from_array(W2_data, name='W2')
+    
+    b2_data = np.zeros(10, dtype=np.float32)
+    b2_tensor = numpy_helper.from_array(b2_data, name='b2')
+    
+    # Create nodes
+    # First layer: input @ W1 + b1
+    matmul1_node = helper.make_node(
+        'MatMul',
+        inputs=['input', 'W1'],
+        outputs=['hidden_raw']
+    )
+    
+    add1_node = helper.make_node(
+        'Add',
+        inputs=['hidden_raw', 'b1'],
+        outputs=['hidden_with_bias']
+    )
+    
+    # ReLU activation
+    relu_node = helper.make_node(
+        'Relu',
+        inputs=['hidden_with_bias'],
+        outputs=['hidden_activated']
+    )
+    
+    # Second layer: hidden @ W2 + b2
+    matmul2_node = helper.make_node(
+        'MatMul',
+        inputs=['hidden_activated', 'W2'],
+        outputs=['logits_raw']
+    )
+    
+    add2_node = helper.make_node(
+        'Add',
+        inputs=['logits_raw', 'b2'],
+        outputs=['logits']
+    )
+    
+    # Softmax for probabilities
+    softmax_node = helper.make_node(
+        'Softmax',
+        inputs=['logits'],
+        outputs=['output']
     )
     
     # Create the graph
     graph = helper.make_graph(
-        nodes=[reduce_sum_node],
-        name='SimpleSum',
+        nodes=[matmul1_node, add1_node, relu_node, matmul2_node, add2_node, softmax_node],
+        name='MNISTClassifier',
         inputs=[input_tensor],
-        outputs=[output_tensor]
+        outputs=[output_tensor],
+        initializer=[W1_tensor, b1_tensor, W2_tensor, b2_tensor]
     )
     
     # Create the model
@@ -69,7 +117,7 @@ def create_simple_onnx_graph(
     # Save the model
     onnx.save(model, save_path)
     
-    print(f"Simple sum ONNX model saved to {save_path}")
+    print(f"MNIST classifier ONNX model saved to {save_path}")
     return save_path
 
 
@@ -274,15 +322,17 @@ class OnnxHandler:
 def generate_test_data(
     input_shape: Tuple[int, ...],
     num_samples: int = 100,
-    value_range: Tuple[float, float] = (-10.0, 10.0)
+    value_range: Tuple[float, float] = (0.0, 1.0)
 ) -> torch.Tensor:
     """
     Generate test data for ONNX model testing.
     
+    For MNIST-like data, generates normalized pixel values between 0 and 1.
+    
     Args:
-        input_shape: Shape of each input sample
+        input_shape: Shape of each input sample (e.g., (196,) for 14x14 flattened)
         num_samples: Number of samples to generate
-        value_range: Range of values to generate
+        value_range: Range of values to generate (0-1 for normalized images)
         
     Returns:
         Tensor of test data with shape (num_samples, *input_shape)
