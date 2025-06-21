@@ -18,6 +18,10 @@ from .networks import (
 
 from .training import ZKTrainer
 
+from .plotting import ZKPlotter, create_training_plots
+
+from .inference import ZKInference, run_inference_analysis
+
 from .benchmarks import ZKBenchmark
 
 from .utils import (
@@ -46,6 +50,14 @@ __all__ = [
     
     # Training system
     "ZKTrainer",
+    
+    # Plotting and visualization
+    "ZKPlotter",
+    "create_training_plots",
+    
+    # Inference and analysis
+    "ZKInference",
+    "run_inference_analysis",
     
     # Benchmarking
     "ZKBenchmark",

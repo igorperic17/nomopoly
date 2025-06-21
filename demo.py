@@ -147,8 +147,8 @@ def run_zkgap_training():
     print(f"\n🚀 Starting zkGAP-style adversarial training...")
     stats = trainer.train(num_epochs=50, num_samples=3000)
     
-    # Plot results
-    trainer.plot_training_progress(stats, "plots/hrr_training_progress.png")
+    # Create comprehensive plots
+    plot_paths = trainer.create_training_plots(stats)
     
     # Skip ONNX export for now (has dynamic padding issues)
     print(f"\n📁 Network export skipped (ONNX has dynamic padding issues)")
@@ -157,93 +157,23 @@ def run_zkgap_training():
     return trainer, stats
 
 def demonstrate_live_verification(trainer):
-    """Show live proof verification with HRR."""
+    """Show live proof verification with comprehensive triplet analysis."""
     print("\n" + "=" * 70)
-    print("🔍 LIVE PROOF VERIFICATION WITH HRR")
+    print("🔍 LIVE COMPREHENSIVE TRIPLET VERIFICATION")
     print("=" * 70)
     
-    # Load some real MNIST samples
-    transform = transforms.Compose([
-        transforms.Resize((14, 14)),
-        transforms.ToTensor(),
-        transforms.Lambda(lambda x: x.view(-1))
-    ])
+    from nomopoly.inference import ZKInference
     
-    test_dataset = datasets.MNIST('./data', train=False, download=True, transform=transform)
+    # Create inference engine
+    inference_engine = ZKInference(
+        trainer.inference_net,
+        trainer.verifier_net,
+        trainer.malicious_net,
+        trainer.device
+    )
     
-    # Get test samples
-    test_samples = []
-    test_labels = []
-    for i in range(6):
-        sample, label = test_dataset[i * 200]  # Every 200th sample
-        test_samples.append(sample)
-        test_labels.append(label)
-    
-    test_data = torch.stack(test_samples)
-    test_labels = torch.tensor(test_labels)
-    
-    # Move to device
-    device = trainer.device
-    test_data = test_data.to(device)
-    test_labels = test_labels.to(device)
-    
-    print(f"🧪 Testing HRR proof verification on {len(test_samples)} MNIST samples...")
-    
-    # Set networks to eval mode
-    trainer.inference_net.eval()
-    trainer.verifier_net.eval()
-    trainer.malicious_net.eval()
-    
-    with torch.no_grad():
-        # Get authentic proofs from inference network
-        real_results, real_proofs = trainer.inference_net(test_data)
-        real_probs = torch.exp(real_results)  # Convert log probs
-        real_predictions = torch.argmax(real_results, dim=1)
-        
-        # Get fake proofs from malicious network
-        fake_results, fake_proofs = trainer.malicious_net(test_data)
-        fake_predictions = torch.argmax(fake_results, dim=1)
-        
-        # Verify proofs using triplet verification (input, output, proof)
-        real_verification = trainer.verifier_net(test_data, real_results, real_proofs)
-        fake_verification = trainer.verifier_net(test_data, fake_results, fake_proofs)
-        
-        print(f"\n📊 HRR Proof Verification Results:")
-        print(f"{'Sample':<8} {'True':<6} {'Predicted':<10} {'Confidence':<12} {'Real Proof':<12} {'Fake Proof':<12}")
-        print("-" * 80)
-        
-        for i in range(len(test_samples)):
-            true_label = test_labels[i].item()
-            pred_label = real_predictions[i].item()
-            confidence = real_probs[i, pred_label].item()
-            real_score = real_verification[i].item()
-            fake_score = fake_verification[i].item()
-            
-            # Classification correctness
-            correct = "✅" if pred_label == true_label else "❌"
-            
-            print(f"{i+1:<8} {true_label:<6} {pred_label:<10} {correct:<4} {confidence:.1%:<12} {real_score:.3f:<12} {fake_score:.3f}")
-        
-        # Overall statistics
-        classification_acc = (real_predictions == test_labels).float().mean().item()
-        real_proof_score = real_verification.mean().item()
-        fake_proof_score = fake_verification.mean().item()
-        verifier_accuracy = ((real_verification > 0.5).float().mean() + (fake_verification < 0.5).float().mean()) / 2
-        proof_separation = real_proof_score - fake_proof_score
-        
-        print(f"\n📈 HRR System Performance:")
-        print(f"   Classification Accuracy: {classification_acc:.1%}")
-        print(f"   Real Proof Average Score: {real_proof_score:.3f}")
-        print(f"   Fake Proof Average Score: {fake_proof_score:.3f}")
-        print(f"   Proof Score Separation: {proof_separation:.3f}")
-        print(f"   Verifier Accuracy: {verifier_accuracy:.1%}")
-        
-        if verifier_accuracy > 0.75 and proof_separation > 0.2:
-            print("🎉 SUCCESS: HRR-based verifier working excellently!")
-        elif verifier_accuracy > 0.6 or proof_separation > 0.1:
-            print("⚠️ PARTIAL: Some HRR learning achieved")
-        else:
-            print("❌ NEEDS WORK: HRR system needs improvement")
+    # Run comprehensive verification demo
+    inference_engine.run_sample_verification_demo(8)
 
 def main():
     """Main demo function."""

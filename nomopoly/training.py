@@ -361,69 +361,17 @@ class ZKTrainer:
         
         return stats
         
-    def plot_training_progress(self, stats: Dict[str, List[float]], save_path: str = None):
-        """Plot training statistics focusing on binary classification performance."""
-        fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    def create_training_plots(self, stats: Dict[str, List[float]]) -> List[str]:
+        """
+        Create comprehensive training plots using the plotting module.
         
-        # Loss curves
-        axes[0, 0].plot(stats["verifier_loss"], label="Verifier Loss", linewidth=2, color='blue')
-        axes[0, 0].plot(stats["malicious_loss"], label="Malicious Loss", linewidth=2, color='red')
-        axes[0, 0].set_title("Training Losses")
-        axes[0, 0].set_ylabel("Loss")
-        axes[0, 0].legend()
-        axes[0, 0].grid(True)
+        Args:
+            stats: Training statistics dictionary
+            
+        Returns:
+            List of saved plot paths
+        """
+        from .plotting import ZKPlotter
         
-        # Binary classification accuracy (main metric)
-        axes[0, 1].plot(stats["binary_accuracy"], linewidth=3, color='green', label="Binary Accuracy")
-        axes[0, 1].axhline(y=0.5, color='gray', linestyle='--', label='Random Chance')
-        axes[0, 1].axhline(y=0.85, color='orange', linestyle='--', label='Target: 85%')
-        axes[0, 1].axhline(y=0.95, color='purple', linestyle='--', label='Excellent: 95%')
-        axes[0, 1].set_title("Binary Classification Accuracy (MAIN METRIC)")
-        axes[0, 1].set_ylabel("Accuracy")
-        axes[0, 1].legend()
-        axes[0, 1].grid(True)
-        
-        # Binary components breakdown
-        axes[0, 2].plot(stats["real_correct"], label="Real Detection", linewidth=2, color='blue')
-        axes[0, 2].plot(stats["fake_correct"], label="Fake Rejection", linewidth=2, color='red')
-        axes[0, 2].axhline(y=0.85, color='green', linestyle='--', label='Target: 85%')
-        axes[0, 2].set_title("Binary Classification Components")
-        axes[0, 2].set_ylabel("Accuracy")
-        axes[0, 2].legend()
-        axes[0, 2].grid(True)
-        
-        # Malicious success rate (should be balanced, not too high or low)
-        axes[1, 0].plot(stats["malicious_success"], linewidth=3, color='red', label="Malicious Success")
-        axes[1, 0].axhline(y=0.5, color='gray', linestyle='--', label='Balanced')
-        axes[1, 0].axhline(y=0.3, color='green', linestyle='--', label='Good Defense')
-        axes[1, 0].axhline(y=0.7, color='orange', linestyle='--', label='Strong Attack')
-        axes[1, 0].set_title("Malicious Success Rate")
-        axes[1, 0].set_ylabel("Success Rate")
-        axes[1, 0].legend()
-        axes[1, 0].grid(True)
-        
-        # Score separation
-        axes[1, 1].plot(stats["real_score_mean"], label="Real Score Mean", linewidth=2, color='blue')
-        axes[1, 1].plot(stats["fake_score_mean"], label="Fake Score Mean", linewidth=2, color='red')
-        axes[1, 1].set_title("Verifier Score Means")
-        axes[1, 1].set_ylabel("Score")
-        axes[1, 1].legend()
-        axes[1, 1].grid(True)
-        
-        # Score gap (key indicator of learning)
-        axes[1, 2].plot(stats["score_separation"], linewidth=3, color='purple', label="Score Separation")
-        axes[1, 2].axhline(y=0, color='gray', linestyle='--', label='No Separation')
-        axes[1, 2].axhline(y=0.3, color='green', linestyle='--', label='Good Separation')
-        axes[1, 2].axhline(y=0.5, color='orange', linestyle='--', label='Excellent Separation')
-        axes[1, 2].set_title("Score Separation (Real - Fake)")
-        axes[1, 2].set_ylabel("Separation")
-        axes[1, 2].legend()
-        axes[1, 2].grid(True)
-        
-        plt.tight_layout()
-        
-        if save_path:
-            plt.savefig(save_path, dpi=300, bbox_inches='tight')
-            print(f"Training plot saved to {save_path}")
-        
-        plt.close()
+        plotter = ZKPlotter(self.plots_dir)
+        return plotter.create_summary_report(stats)
