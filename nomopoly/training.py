@@ -123,7 +123,13 @@ class ZKTrainer:
         
     def train_step(self, data_generator: Callable, epoch: int) -> Dict[str, float]:
         """
-        Perform one training step focusing on binary proof classification.
+        Perform one training step with comprehensive triplet verification.
+        
+        Tests all four critical cases:
+        ✅ Real proofs + Real results: Should be ~100% accepted
+        ❌ Fake proofs + Fake results: Should be ~100% rejected  
+        ❌ Fake proofs + Real results: Should be ~100% rejected
+        ❌ Real proofs + Wrong results: Should be ~100% rejected
         
         Args:
             data_generator: Function that generates training data
@@ -134,6 +140,7 @@ class ZKTrainer:
         """
         # Generate training data
         training_data = data_generator()
+        input_batch = training_data[0]
         
         # Initialize optimizers for dynamic networks if not already done
         if self.verifier_optimizer is None:
@@ -141,8 +148,8 @@ class ZKTrainer:
                 print("🔧 Building verifier network layers...")
             # Run forward pass to build dynamic layers
             with torch.no_grad():  # Inference network is frozen
-                real_result, real_proof = self.inference_net(*training_data)
-            _ = self.verifier_net(real_proof, real_result)  # This builds the layers
+                real_result, real_proof = self.inference_net(input_batch)
+            _ = self.verifier_net(input_batch, real_result, real_proof)  # This builds the layers
             self.verifier_optimizer = optim.Adam(self.verifier_net.parameters(), lr=0.002)  # Higher LR for verifier
             if epoch == 0:
                 print("✅ Verifier optimizer created")
@@ -151,69 +158,98 @@ class ZKTrainer:
             if epoch == 0:
                 print("🔧 Building malicious network layers...")
             # Build malicious network layers if needed
-            fake_result, fake_proof = self.malicious_net(*training_data)
+            fake_result, fake_proof = self.malicious_net(input_batch, mode="mixed")
             self.malicious_optimizer = optim.Adam(self.malicious_net.parameters(), lr=0.0005)  # Lower LR for adversary
             if epoch == 0:
                 print("✅ Malicious optimizer created")
         
-        # === STEP 1: Train Verifier for Binary Classification ===
+        # === STEP 1: Train Verifier with Four Types of Samples ===
         self.verifier_optimizer.zero_grad()
         
-        # Generate real proofs (from frozen inference network)
+        # Generate authentic samples (from frozen inference network)
         with torch.no_grad():  # Inference network is frozen
-            real_result, real_proof = self.inference_net(*training_data)
+            real_result, real_proof = self.inference_net(input_batch)
         
-        # Generate fake proofs (from trainable malicious network)
-        fake_result, fake_proof = self.malicious_net(*training_data)
+        # Generate fake samples (from trainable malicious network)
+        fake_result, fake_proof = self.malicious_net(input_batch, mode="mixed")
         
-        # Verifier should output 1 for real proofs, 0 for fake proofs
-        real_verification = self.verifier_net(real_proof, real_result)
-        fake_verification = self.verifier_net(fake_proof, fake_result)
+        # Create wrong results by shuffling real results
+        batch_size = real_result.shape[0]
+        shuffle_indices = torch.randperm(batch_size, device=real_result.device)
+        wrong_result = real_result[shuffle_indices]
         
-        # Binary classification loss
-        verifier_loss_real = self.criterion(real_verification, torch.ones_like(real_verification))
-        verifier_loss_fake = self.criterion(fake_verification, torch.zeros_like(fake_verification))
-        verifier_loss = verifier_loss_real + verifier_loss_fake
+        # === Four Types of Verification Samples ===
         
+        # Type 1: ✅ Real proofs + Real results → Should accept (score = 1)
+        real_real_verification = self.verifier_net(input_batch, real_result, real_proof)
+        loss_real_real = self.criterion(real_real_verification, torch.ones_like(real_real_verification))
+        
+        # Type 2: ❌ Fake proofs + Fake results → Should reject (score = 0)
+        fake_fake_verification = self.verifier_net(input_batch, fake_result, fake_proof)
+        loss_fake_fake = self.criterion(fake_fake_verification, torch.zeros_like(fake_fake_verification))
+        
+        # Type 3: ❌ Fake proofs + Real results → Should reject (score = 0)
+        fake_real_verification = self.verifier_net(input_batch, real_result, fake_proof)
+        loss_fake_real = self.criterion(fake_real_verification, torch.zeros_like(fake_real_verification))
+        
+        # Type 4: ❌ Real proofs + Wrong results → Should reject (score = 0)
+        real_wrong_verification = self.verifier_net(input_batch, wrong_result, real_proof)
+        loss_real_wrong = self.criterion(real_wrong_verification, torch.zeros_like(real_wrong_verification))
+        
+        # Total verifier loss (all four cases)
+        verifier_loss = loss_real_real + loss_fake_fake + loss_fake_real + loss_real_wrong
         verifier_loss.backward()
         self.verifier_optimizer.step()
         
         # === STEP 2: Train Malicious Network to fool the verifier ===
         self.malicious_optimizer.zero_grad()
         
-        # Generate new fake proofs for adversarial training
-        fake_result, fake_proof = self.malicious_net(*training_data)
-        fake_verification = self.verifier_net(fake_proof, fake_result)
+        # Generate new fake samples for adversarial training
+        fake_result_adv, fake_proof_adv = self.malicious_net(input_batch, mode="mixed")
+        fake_fake_verification_adv = self.verifier_net(input_batch, fake_result_adv, fake_proof_adv)
         
-        # Malicious network wants verifier to output 1 (fooled)
-        malicious_loss = self.criterion(fake_verification, torch.ones_like(fake_verification))
+        # Malicious network wants verifier to accept fake samples (score = 1)
+        malicious_loss = self.criterion(fake_fake_verification_adv, torch.ones_like(fake_fake_verification_adv))
         malicious_loss.backward()
         self.malicious_optimizer.step()
         
-        # Calculate training metrics
+        # === Calculate Comprehensive Metrics ===
         with torch.no_grad():
-            # Binary classification accuracy
-            real_correct = (real_verification > 0.5).float().mean().item()
-            fake_correct = (fake_verification < 0.5).float().mean().item()  
-            binary_accuracy = (real_correct + fake_correct) / 2
+            # Accuracy for each verification type
+            real_real_acc = (real_real_verification > 0.5).float().mean().item()  # Should be ~100%
+            fake_fake_acc = (fake_fake_verification < 0.5).float().mean().item()  # Should be ~100%
+            fake_real_acc = (fake_real_verification < 0.5).float().mean().item()  # Should be ~100%
+            real_wrong_acc = (real_wrong_verification < 0.5).float().mean().item()  # Should be ~100%
+            
+            # Overall verification accuracy
+            overall_accuracy = (real_real_acc + fake_fake_acc + fake_real_acc + real_wrong_acc) / 4
             
             # Adversarial metrics
-            malicious_success = (fake_verification > 0.5).float().mean().item()
+            malicious_success = (fake_fake_verification_adv > 0.5).float().mean().item()
             
-            # Score separation
-            real_score_mean = real_verification.mean().item()
-            fake_score_mean = fake_verification.mean().item()
-            score_separation = real_score_mean - fake_score_mean
+            # Score statistics
+            real_real_mean = real_real_verification.mean().item()
+            fake_fake_mean = fake_fake_verification.mean().item()
+            fake_real_mean = fake_real_verification.mean().item()
+            real_wrong_mean = real_wrong_verification.mean().item()
+            
+            # Score separation (real vs all fake types)
+            fake_scores_mean = (fake_fake_mean + fake_real_mean + real_wrong_mean) / 3
+            score_separation = real_real_mean - fake_scores_mean
         
         return {
             'verifier_loss': verifier_loss.item(),
             'malicious_loss': malicious_loss.item(),
-            'binary_accuracy': binary_accuracy,
-            'real_correct': real_correct,
-            'fake_correct': fake_correct,
+            'overall_accuracy': overall_accuracy,
+            'real_real_acc': real_real_acc,
+            'fake_fake_acc': fake_fake_acc,
+            'fake_real_acc': fake_real_acc,
+            'real_wrong_acc': real_wrong_acc,
             'malicious_success': malicious_success,
-            'real_score_mean': real_score_mean,
-            'fake_score_mean': fake_score_mean,
+            'real_real_mean': real_real_mean,
+            'fake_fake_mean': fake_fake_mean,
+            'fake_real_mean': fake_real_mean,
+            'real_wrong_mean': real_wrong_mean,
             'score_separation': score_separation
         }
 
@@ -224,23 +260,32 @@ class ZKTrainer:
         self.setup_plots_directory()
         data_generator = self.load_mnist_data(num_samples)
         
-        print(f"Starting ZK binary proof verification training on {self.device}")
+        print(f"Starting ZK comprehensive triplet verification training on {self.device}")
         print("🎯 Training Goals:")
         print("   Inference Network: FROZEN - generates authentic proofs")
-        print("   Verifier Network: Learn binary classification (real vs fake proofs)")
-        print("   Malicious Network: Generate fake proofs to fool verifier")
-        print("   SUCCESS = High verifier binary classification accuracy (>85%)")
+        print("   Verifier Network: Learn to verify (input, output, proof) triplets")
+        print("   Malicious Network: Generate fake outputs and fake proofs")
+        print("   SUCCESS = High accuracy on all four verification types (>90%)")
+        print("\n🔍 Four Verification Types:")
+        print("   ✅ Real proofs + Real results: Should be ~100% accepted")
+        print("   ❌ Fake proofs + Fake results: Should be ~100% rejected")
+        print("   ❌ Fake proofs + Real results: Should be ~100% rejected")
+        print("   ❌ Real proofs + Wrong results: Should be ~100% rejected")
         
         # Training statistics
         stats = {
             "verifier_loss": [],
             "malicious_loss": [],
-            "binary_accuracy": [],
-            "real_correct": [],
-            "fake_correct": [],
+            "overall_accuracy": [],
+            "real_real_acc": [],
+            "fake_fake_acc": [],
+            "fake_real_acc": [],
+            "real_wrong_acc": [],
             "malicious_success": [],
-            "real_score_mean": [],
-            "fake_score_mean": [],
+            "real_real_mean": [],
+            "fake_fake_mean": [],
+            "fake_real_mean": [],
+            "real_wrong_mean": [],
             "score_separation": []
         }
         
@@ -261,43 +306,49 @@ class ZKTrainer:
             # Progress reporting
             if epoch % 10 == 0 or epoch == 0:
                 print(f"\nEpoch {epoch + 1}/{num_epochs}:")
-                print(f"  🎯 Binary Accuracy: {step_stats['binary_accuracy']:.1%}")
-                print(f"  ✅ Real Detection: {step_stats['real_correct']:.1%}")
-                print(f"  ❌ Fake Rejection: {step_stats['fake_correct']:.1%}")
+                print(f"  🎯 Overall Accuracy: {step_stats['overall_accuracy']:.1%}")
+                print(f"  ✅ Real+Real: {step_stats['real_real_acc']:.1%}")
+                print(f"  ❌ Fake+Fake: {step_stats['fake_fake_acc']:.1%}")
+                print(f"  ❌ Fake+Real: {step_stats['fake_real_acc']:.1%}")
+                print(f"  ❌ Real+Wrong: {step_stats['real_wrong_acc']:.1%}")
                 print(f"  🎭 Malicious Success: {step_stats['malicious_success']:.1%}")
                 print(f"  📊 Score Gap: {step_stats['score_separation']:.3f}")
         
-        print("\n✅ Binary proof verification training completed!")
+        print("\n✅ Comprehensive triplet verification training completed!")
         
         # Final analysis
-        final_binary_accuracy = stats["binary_accuracy"][-1]
-        final_real_correct = stats["real_correct"][-1]
-        final_fake_correct = stats["fake_correct"][-1]
+        final_overall_accuracy = stats["overall_accuracy"][-1]
+        final_real_real_acc = stats["real_real_acc"][-1]
+        final_fake_fake_acc = stats["fake_fake_acc"][-1]
+        final_fake_real_acc = stats["fake_real_acc"][-1]
+        final_real_wrong_acc = stats["real_wrong_acc"][-1]
         final_malicious_success = stats["malicious_success"][-1]
         final_score_separation = stats["score_separation"][-1]
         
         print(f"\n📈 FINAL PERFORMANCE:")
-        print(f"   🎯 Binary Classification Accuracy: {final_binary_accuracy:.1%}")
-        print(f"   ✅ Real Proof Detection: {final_real_correct:.1%}")
-        print(f"   ❌ Fake Proof Rejection: {final_fake_correct:.1%}")
+        print(f"   🎯 Overall Verification Accuracy: {final_overall_accuracy:.1%}")
+        print(f"   ✅ Real proofs + Real results: {final_real_real_acc:.1%}")
+        print(f"   ❌ Fake proofs + Fake results: {final_fake_fake_acc:.1%}")
+        print(f"   ❌ Fake proofs + Real results: {final_fake_real_acc:.1%}")
+        print(f"   ❌ Real proofs + Wrong results: {final_real_wrong_acc:.1%}")
         print(f"   🎭 Malicious Success Rate: {final_malicious_success:.1%}")
         print(f"   📊 Score Separation: {final_score_separation:.3f}")
         
         # Evaluate training success
-        if final_binary_accuracy > 0.90:
-            print("🎉 EXCELLENT: Verifier achieved outstanding binary classification!")
+        if final_overall_accuracy > 0.95:
+            print("🎉 EXCELLENT: Verifier achieved outstanding triplet verification!")
             success_level = "EXCELLENT"
-        elif final_binary_accuracy > 0.85:
-            print("✅ VERY GOOD: Strong binary classification performance")
+        elif final_overall_accuracy > 0.90:
+            print("✅ VERY GOOD: Strong triplet verification performance")
             success_level = "VERY_GOOD"
-        elif final_binary_accuracy > 0.75:
-            print("✅ GOOD: Decent binary classification performance")
+        elif final_overall_accuracy > 0.85:
+            print("✅ GOOD: Decent triplet verification performance")
             success_level = "GOOD"
-        elif final_binary_accuracy > 0.65:
+        elif final_overall_accuracy > 0.75:
             print("⚠️ MODERATE: Some learning occurred")
             success_level = "MODERATE"
         else:
-            print("❌ POOR: Binary classification failed")
+            print("❌ POOR: Triplet verification failed")
             success_level = "FAILED"
             
         # Check adversarial balance

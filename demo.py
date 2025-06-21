@@ -204,9 +204,9 @@ def demonstrate_live_verification(trainer):
         fake_results, fake_proofs = trainer.malicious_net(test_data)
         fake_predictions = torch.argmax(fake_results, dim=1)
         
-        # Verify proofs
-        real_verification = trainer.verifier_net(real_proofs, real_results)
-        fake_verification = trainer.verifier_net(fake_proofs, fake_results)
+        # Verify proofs using triplet verification (input, output, proof)
+        real_verification = trainer.verifier_net(test_data, real_results, real_proofs)
+        fake_verification = trainer.verifier_net(test_data, fake_results, fake_proofs)
         
         print(f"\n📊 HRR Proof Verification Results:")
         print(f"{'Sample':<8} {'True':<6} {'Predicted':<10} {'Confidence':<12} {'Real Proof':<12} {'Fake Proof':<12}")

@@ -309,8 +309,8 @@ class ZKProverNet(nn.Module):
 
 class ZKVerifierNet(nn.Module):
     """
-    ZK Verifier Network: Validates (proof, result) pairs.
-    Uses dynamic layer building like zkGAP for flexibility.
+    ZK Verifier Network: Validates (input, output, proof) triplets.
+    Verifies that the proof is authentic for the given input-output pair.
     """
     
     def __init__(self, input_dim: int, output_dim: int, proof_dim: int = 64):
@@ -320,30 +320,43 @@ class ZKVerifierNet(nn.Module):
         self.proof_dim = proof_dim
         self.layers = None
         
-    def _build_layers(self, proof_dim, result_dim, device):
+    def _build_layers(self, input_dim, output_dim, proof_dim, device):
         """Build verifier layers dynamically on first forward pass."""
-        input_dim = proof_dim + result_dim
+        total_input_dim = input_dim + output_dim + proof_dim
         self.layers = nn.Sequential(
-            nn.Linear(input_dim, 256),
+            nn.Linear(total_input_dim, 512),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.2),
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Linear(64, 1),
             nn.Sigmoid()
         ).to(device)
         
-    def forward(self, proof: torch.Tensor, result: torch.Tensor) -> torch.Tensor:
-        """Verify if proof matches result."""
+    def forward(self, input_data: torch.Tensor, output_data: torch.Tensor, proof: torch.Tensor) -> torch.Tensor:
+        """
+        Verify if the (input, output, proof) triplet is valid.
+        
+        Args:
+            input_data: Original input to the computation
+            output_data: Claimed output of the computation
+            proof: Proof that the computation was performed correctly
+            
+        Returns:
+            Verification score (0-1): 1 = valid triplet, 0 = invalid triplet
+        """
         if self.layers is None:
             # Build layers dynamically
-            self._build_layers(proof.shape[-1], result.shape[-1], proof.device)
+            self._build_layers(input_data.shape[-1], output_data.shape[-1], proof.shape[-1], input_data.device)
         
-        # Concatenate proof and result
-        combined = torch.cat([proof, result], dim=-1)
+        # Concatenate input, output, and proof
+        combined = torch.cat([input_data, output_data, proof], dim=-1)
         
         # Return verification score
         return self.layers(combined)
@@ -351,8 +364,8 @@ class ZKVerifierNet(nn.Module):
 
 class ZKAdversarialNet(nn.Module):
     """
-    ZK Adversarial Network: Generates fake proofs that try to fool the verifier.
-    This network should generate convincing but fake proofs.
+    ZK Adversarial Network: Generates fake outputs and fake proofs.
+    Creates different types of adversarial samples to test verifier robustness.
     """
     
     def __init__(self, input_dim: int, output_dim: int, proof_dim: int = 64):
@@ -362,11 +375,11 @@ class ZKAdversarialNet(nn.Module):
         self.output_dim = output_dim
         self.proof_dim = proof_dim
         
-        # Create a simple classifier for results
-        self.classifier = nn.Sequential(
+        # Network for generating slightly different outputs (corrupted but plausible)
+        self.corrupted_classifier = nn.Sequential(
             nn.Linear(input_dim, 128),
             nn.ReLU(),
-            nn.Dropout(0.4),  # Higher dropout for more randomness
+            nn.Dropout(0.4),  # Higher dropout for more variation
             nn.Linear(128, 64),
             nn.ReLU(),
             nn.Dropout(0.4),
@@ -374,38 +387,84 @@ class ZKAdversarialNet(nn.Module):
             nn.LogSoftmax(dim=-1)
         )
         
-        # Create a dedicated fake proof generator
-        # This should learn to generate proofs that fool the verifier
+        # Network for generating completely random outputs
+        self.random_output_generator = nn.Sequential(
+            nn.Linear(input_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, output_dim),
+            nn.LogSoftmax(dim=-1)
+        )
+        
+        # Fake proof generator that tries to create convincing proofs for wrong outputs
         self.fake_proof_generator = nn.Sequential(
-            nn.Linear(input_dim, 256),
+            nn.Linear(input_dim + output_dim, 256),  # Takes input + fake output
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(128, proof_dim),
-            nn.Tanh()  # Bounded output to match proof range
+            nn.Tanh()  # Bounded output
         )
         
-        # Add some noise layers to make proofs more "fake"
-        self.noise_layer = nn.Sequential(
+        # Noise layer for proof variation
+        self.proof_noise_layer = nn.Sequential(
             nn.Linear(proof_dim, proof_dim),
             nn.ReLU(),
             nn.Linear(proof_dim, proof_dim)
         )
         
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Generate fake results and fake proofs that try to fool the verifier."""
-        # Generate classification result
-        result = self.classifier(x)
+    def forward(self, x: torch.Tensor, mode: str = "mixed") -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Generate fake outputs and fake proofs.
         
-        # Generate base fake proof from input
-        base_proof = self.fake_proof_generator(x)
+        Args:
+            x: Input tensor
+            mode: Type of fake output to generate
+                - "corrupted": Slightly different from correct output
+                - "random": Completely random output
+                - "mixed": Randomly choose between corrupted and random
+                
+        Returns:
+            Tuple of (fake_output, fake_proof)
+        """
+        batch_size = x.shape[0]
         
-        # Add adversarial noise to make it more convincing
-        fake_proof = base_proof + self.noise_layer(base_proof) * 0.1
+        if mode == "mixed":
+            # Randomly choose between corrupted and random for each sample
+            use_corrupted = torch.rand(batch_size, 1, device=x.device) > 0.5
+            
+            corrupted_output = self.corrupted_classifier(x)
+            random_output = self.random_output_generator(x)
+            
+            # Mix outputs based on random choice
+            fake_output = torch.where(use_corrupted, corrupted_output, random_output)
+            
+        elif mode == "corrupted":
+            fake_output = self.corrupted_classifier(x)
+            
+        elif mode == "random":
+            fake_output = self.random_output_generator(x)
+            
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
         
-        return result, fake_proof
+        # Generate fake proof for the fake output
+        proof_input = torch.cat([x, fake_output], dim=-1)
+        base_fake_proof = self.fake_proof_generator(proof_input)
+        
+        # Add noise to make proof more convincing
+        fake_proof = base_fake_proof + self.proof_noise_layer(base_fake_proof) * 0.1
+        
+        return fake_output, fake_proof
+    
+    def generate_corrupted_output(self, x: torch.Tensor) -> torch.Tensor:
+        """Generate slightly corrupted but plausible output."""
+        return self.corrupted_classifier(x)
+    
+    def generate_random_output(self, x: torch.Tensor) -> torch.Tensor:
+        """Generate completely random output."""
+        return self.random_output_generator(x)
 
 
 # Factory function for easy creation
