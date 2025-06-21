@@ -8,7 +8,7 @@ Zero Knowledge ML (ZKML) circuits using adversarial training.
 from .networks import ZKProverNet, ZKVerifierNet, ZKAdversarialNet
 from .training import AutoZKTraining
 from .utils import create_simple_onnx_graph, OnnxHandler
-from .benchmarks import ZKMLBenchmark
+from .benchmarks import ZKBenchmark
 
 __version__ = "0.1.0"
 __author__ = "Igor"
@@ -20,5 +20,5 @@ __all__ = [
     "AutoZKTraining",
     "create_simple_onnx_graph",
     "OnnxHandler",
-    "ZKMLBenchmark",
+    "ZKBenchmark",
 ] 

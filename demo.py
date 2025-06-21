@@ -1,243 +1,157 @@
 #!/usr/bin/env python3
 """
-Nomopoly Demo: Zero Knowledge Machine Learning Proof of Concept
-
-This script demonstrates the complete workflow of nomopoly:
-1. Create a simple ONNX computation graph (sum of two numbers)
-2. Initialize ZK networks (Prover, Verifier, Adversary)
-3. Train the networks using adversarial training
-4. Evaluate and benchmark the results
-5. Export models to ONNX format
-
-Run this script to see nomopoly in action!
+Demo script showcasing Zero Knowledge Machine Learning with MNIST classification.
 """
 
 import torch
 import numpy as np
-import matplotlib.pyplot as plt
-import os
-from datetime import datetime
-
-# Import nomopoly modules
-from nomopoly import (
-    ZKProverNet, 
-    ZKVerifierNet, 
-    ZKAdversarialNet,
-    AutoZKTraining,
-    create_simple_onnx_graph,
-    OnnxHandler,
-    ZKMLBenchmark
-)
+from torchvision import datasets, transforms
+from nomopoly.networks import ZKProverNet, ZKVerifierNet, ZKAdversarialNet
+from nomopoly.training import AutoZKTraining
+from nomopoly.benchmarks import ZKBenchmark
 
 
-def main():
-    """Main demo function."""
+def get_real_mnist_sample(digit: int = None) -> torch.Tensor:
+    """Get a real MNIST sample for demonstration."""
+    
+    # Transform to match our network input
+    transform = transforms.Compose([
+        transforms.Resize((14, 14)),
+        transforms.ToTensor(),
+        transforms.Lambda(lambda x: x.view(-1))
+    ])
+    
+    # Load MNIST test set
+    test_dataset = datasets.MNIST(
+        root='./data', 
+        train=False, 
+        download=True, 
+        transform=transform
+    )
+    
+    if digit is not None:
+        # Find samples of the specific digit
+        indices = [i for i, (_, label) in enumerate(test_dataset) if label == digit]
+        if indices:
+            idx = np.random.choice(indices)
+            sample, label = test_dataset[idx]
+            return sample.unsqueeze(0), label
+    
+    # Random sample
+    idx = np.random.randint(len(test_dataset))
+    sample, label = test_dataset[idx]
+    return sample.unsqueeze(0), label
+
+
+def demonstrate_zk_classification():
+    """Demonstrate the ZK classification system with computational proofs."""
+    print("🔐 Zero Knowledge MNIST Classification Demo")
     print("=" * 60)
-    print("🔐 NOMOPOLY - Zero Knowledge Machine Learning Demo")
-    print("No more polynomial commitments!")
-    print("=" * 60)
     
-    # Set random seeds for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
+    # Initialize networks
+    input_dim = 196  # 14x14 flattened
+    output_dim = 10  # MNIST digits 0-9
+    hidden_dims = (128, 256)
+    proof_dim = 64
     
-    # Configuration
-    config = {
-        "input_dim": 196,  # 14x14 flattened image
-        "output_dim": 10,  # 10 digit classes
-        "proof_dim": 64,
-        "num_epochs": 50,
-        "num_samples": 5000,
-        "test_samples": 1000,
-        "device": "auto"
-    }
+    print(f"Creating ZK networks (input: {input_dim}, output: {output_dim}, proof: {proof_dim})")
     
-    print(f"Configuration: {config}")
-    print()
+    prover = ZKProverNet(input_dim, output_dim, proof_dim, hidden_dims)
+    verifier = ZKVerifierNet(input_dim, output_dim, proof_dim, (256, 128))
+    adversary = ZKAdversarialNet(input_dim, output_dim, proof_dim, (128, 256, 128))
     
-    # Step 1: Create MNIST ONNX graph
-    print("📊 Step 1: Creating MNIST classification ONNX graph...")
-    onnx_path = create_simple_onnx_graph("models/mnist_classifier.onnx")
+    print(f"Networks created with {sum(p.numel() for p in prover.parameters()):,} prover parameters")
     
-    # Verify the ONNX model works (skip verification to avoid compatibility issues)
-    print("✅ ONNX model created (skipping verification due to version compatibility)")
-    print()
+    # Initialize training
+    trainer = AutoZKTraining(prover, verifier, adversary)
     
-    # Step 2: Initialize ZK Networks
-    print("🧠 Step 2: Initializing ZK Networks...")
+    # Train the system
+    print("\n🏋️ Training ZK system with computational proofs on real MNIST...")
+    training_stats = trainer.train(num_epochs=50, num_samples=5000)
     
-    # Create networks
-    prover = ZKProverNet(
-        input_dim=config["input_dim"],
-        output_dim=config["output_dim"],
-        proof_dim=config["proof_dim"],
-        hidden_dims=(128, 256, 128)
-    )
+    # Plot training progress
+    trainer.plot_training_progress(training_stats, "plots/training_progress.png")
     
-    verifier = ZKVerifierNet(
-        input_dim=config["input_dim"],
-        output_dim=config["output_dim"],
-        proof_dim=config["proof_dim"],
-        hidden_dims=(256, 512, 256, 128)
-    )
+    # Run comprehensive benchmarking
+    print("\n📊 Running comprehensive benchmarks...")
+    benchmark = ZKBenchmark(prover, verifier, adversary)
+    benchmark_results = benchmark.run_comprehensive_benchmark(num_test_samples=1000)
+    benchmark.print_benchmark_summary()
     
-    adversary = ZKAdversarialNet(
-        input_dim=config["input_dim"],
-        output_dim=config["output_dim"],
-        proof_dim=config["proof_dim"],
-        hidden_dims=(128, 256, 512, 256, 128)
-    )
-    
-    print(f"✅ Prover parameters: {sum(p.numel() for p in prover.parameters()):,}")
-    print(f"✅ Verifier parameters: {sum(p.numel() for p in verifier.parameters()):,}")
-    print(f"✅ Adversary parameters: {sum(p.numel() for p in adversary.parameters()):,}")
-    print()
-    
-    # Step 3: Train the networks
-    print("🏋️ Step 3: Training ZK Networks...")
-    
-    trainer = AutoZKTraining(
-        prover=prover,
-        verifier=verifier,
-        adversary=adversary,
-        device=config["device"],
-        learning_rates={
-            "prover": 1e-4,
-            "verifier": 2e-4,
-            "adversary": 1e-4
-        }
-    )
-    
-    # Create models directory
-    os.makedirs("models", exist_ok=True)
-    
-    # Train the networks
-    training_stats = trainer.train(
-        num_epochs=config["num_epochs"],
-        num_samples=config["num_samples"],
-        save_interval=10,
-        save_dir="models"
-    )
-    
-    print("✅ Training completed!")
-    print()
-    
-    # Step 4: Evaluate and benchmark
-    print("📈 Step 4: Evaluating and benchmarking...")
-    
-    # Create test data (normalized image data)
-    test_data = torch.FloatTensor(config["test_samples"], config["input_dim"]).uniform_(0.0, 1.0)
-    
-    # Initialize benchmark
-    benchmark = ZKMLBenchmark(
-        prover=prover,
-        verifier=verifier,
-        adversary=adversary,
-        device=config["device"]
-    )
-    
-    # Run comprehensive benchmark
-    results = benchmark.run_comprehensive_benchmark(
-        test_data=test_data,
-        save_results=True,
-        results_dir="benchmark_results"
-    )
-    
-    # Print key results
-    print("\n🎯 Key Results:")
-    print(f"Prover MAE: {results['prover_accuracy']['mae']:.6f}")
-    print(f"Prover Accuracy: {results['prover_accuracy']['accuracy']:.4f}")
-    print()
-    
-    # Step 5: Export models to ONNX
-    print("💾 Step 5: Exporting models to ONNX...")
-    
-    os.makedirs("exported_models", exist_ok=True)
-    
-    trainer.save_models_as_onnx(
-        save_dir="exported_models",
-        input_shape=(1, config["input_dim"])
-    )
-    
-    print("✅ Models exported to ONNX format!")
-    print()
-    
-    # Step 6: Plot training progress
-    print("📊 Step 6: Generating training plots...")
-    
-    os.makedirs("plots", exist_ok=True)
-    trainer.plot_training_progress(save_path="plots/training_progress.png")
-    
-    print("✅ Training plots saved!")
-    print()
-    
-    # Step 7: Demonstrate the system
-    print("🎬 Step 7: Live demonstration...")
-    demonstrate_system(prover, verifier, adversary, trainer.device)
-    
-    print("=" * 60)
-    print("🎉 Demo completed successfully!")
-    print("Files generated:")
-    print("  - models/: Trained PyTorch models")
-    print("  - exported_models/: ONNX models for deployment")
-    print("  - benchmark_results/: Comprehensive benchmark results")
-    print("  - plots/: Training progress visualization")
-    print("  - logs/: TensorBoard logs")
-    print("=" * 60)
-
-
-def demonstrate_system(prover, verifier, adversary, device):
-    """Demonstrate the ZK system with live examples."""
-    print("\n🔍 Live System Demonstration:")
+    # Interactive demonstration
+    print("\n🎮 Interactive Classification Demo with Real MNIST")
+    print("-" * 50)
     
     # Set networks to evaluation mode
     prover.eval()
     verifier.eval()
     adversary.eval()
     
-    # Generate test cases (random image-like data)
-    test_cases = [
-        torch.rand(196) * 0.8 + 0.1,  # Random image 1
-        torch.rand(196) * 0.6 + 0.2,  # Random image 2  
-        torch.rand(196) * 0.9,        # Random image 3
-        torch.rand(196) * 0.7 + 0.3   # Random image 4
-    ]
-    
     with torch.no_grad():
-        for i, inputs in enumerate(test_cases):
-            print(f"\nTest Case {i+1}: Random 14x14 image")
+        for demo_round in range(5):
+            print(f"\n--- Round {demo_round + 1} ---")
             
-            # Convert to tensor and add batch dimension
-            x = inputs.unsqueeze(0).to(device)
+            # Get a real MNIST sample
+            test_input, actual_digit = get_real_mnist_sample()
+            
+            print(f"🎯 Ground Truth: Digit {actual_digit}")
             
             # Prover generates classification and proof
-            log_probs, proof = prover(x)
+            log_probs, _ = prover(test_input)
             probs = torch.exp(log_probs)
-            predicted_class = torch.argmax(probs, dim=1).item()
+            predicted_digit = torch.argmax(log_probs, dim=1).item()
             confidence = torch.max(probs, dim=1)[0].item()
             
-            # Verifier check
-            verification_score = verifier(x, log_probs, proof).item()
+            # Generate computational proof (deterministic from computation)
+            computational_proof = trainer.generate_computational_proof(test_input, log_probs)
             
-            # Adversary generates fake classification
-            fake_log_probs, fake_proof = adversary(x)
-            fake_probs = torch.exp(fake_log_probs)
-            fake_predicted_class = torch.argmax(fake_probs, dim=1).item()
-            fake_confidence = torch.max(fake_probs, dim=1)[0].item()
-            fake_verification = verifier(x, fake_log_probs, fake_proof).item()
+            # Verify computational proof
+            real_verification = verifier(test_input, log_probs, computational_proof)
+            real_score = real_verification.item()
             
-            print(f"  Prover Classification: Digit {predicted_class} (Confidence: {confidence:.4f})")
-            print(f"  Proof Verification: {verification_score:.4f} {'✅' if verification_score > 0.5 else '❌'}")
-            print(f"  Adversary Fake: Digit {fake_predicted_class} (Confidence: {fake_confidence:.4f})")
-            print(f"  Fake Verification: {fake_verification:.4f} {'🚨 FOOLED!' if fake_verification > 0.5 else '✅ DETECTED'}")
+            # Generate fake proof from adversary
+            fake_log_probs, fake_proof = adversary(test_input)
+            fake_verification = verifier(test_input, fake_log_probs, fake_proof)
+            fake_score = fake_verification.item()
+            
+            print(f"🤖 Prover Prediction: Digit {predicted_digit} (confidence: {confidence:.1%})")
+            print(f"✅ Computational Proof Verification: {real_score:.3f} ({'ACCEPTED' if real_score > 0.5 else 'REJECTED'})")
+            print(f"❌ Fake Proof Verification: {fake_score:.3f} ({'ACCEPTED' if fake_score > 0.5 else 'REJECTED'})")
+            
+            # Status
+            classification_correct = predicted_digit == actual_digit
+            proof_system_working = real_score > 0.5 and fake_score < 0.5
+            
+            status = "✅" if classification_correct and proof_system_working else "⚠️"
+            print(f"{status} System Status: Classification {'✓' if classification_correct else '✗'}, "
+                  f"Proof System {'✓' if proof_system_working else '✗'}")
+    
+    # Final system summary
+    print("\n" + "=" * 60)
+    print("🎉 ZK Classification Demo Complete!")
+    
+    # Get final training statistics
+    if training_stats["verifier_accuracy_real"] and training_stats["verifier_accuracy_fake"]:
+        final_real_acc = training_stats["verifier_accuracy_real"][-1]
+        final_fake_acc = training_stats["verifier_accuracy_fake"][-1]
+        final_prover_acc = training_stats["prover_classification_accuracy"][-1]
+        
+        print(f"📈 Final Training Results:")
+        print(f"   Prover Classification Accuracy: {final_prover_acc:.1%}")
+        print(f"   Verifier Real Proof Accuracy: {final_real_acc:.1%}")
+        print(f"   Verifier Fake Rejection Rate: {(1-final_fake_acc):.1%}")
+        print(f"   Overall Verifier Performance: {(final_real_acc + (1-final_fake_acc))/2:.1%}")
+    
+    print(f"📊 Benchmark results saved to: benchmark_results/benchmark_results.json")
+    print(f"📈 Training plots saved to: plots/training_progress.png")
+    print("\n💡 Key Insight: Proofs are generated deterministically from the computation itself")
+    print("   - No secret keys or trusted setup required")
+    print("   - Verifier learns to distinguish computational consistency")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\n⚠️  Demo interrupted by user")
-    except Exception as e:
-        print(f"\n\n❌ Error during demo: {e}")
-        import traceback
-        traceback.print_exc() 
+    # Set random seed for reproducibility
+    torch.manual_seed(42)
+    np.random.seed(42)
+    
+    demonstrate_zk_classification() 

@@ -1,10 +1,48 @@
 {
-  "prover_accuracy": {
-    "mae": 100.21990203857422,
-    "mse": 10060.8642578125,
-    "accuracy": 0.0,
-    "max_error": 111.65919494628906,
-    "min_error": 85.99659729003906,
-    "rmse": 100.30385963567154
+  "device": "cpu",
+  "test_samples": 1000,
+  "timestamp": "2025-06-21 08:50:04",
+  "classification": {
+    "overall_accuracy": 0.948,
+    "average_confidence": "0.9716154",
+    "digit_0": 0.9904761904761905,
+    "digit_1": 0.9819819819819819,
+    "digit_2": 0.9473684210526315,
+    "digit_3": 0.908256880733945,
+    "digit_4": 0.9696969696969697,
+    "digit_5": 0.9347826086956522,
+    "digit_6": 0.9595959595959596,
+    "digit_7": 0.9666666666666667,
+    "digit_8": 0.8369565217391305,
+    "digit_9": 0.9775280898876404
+  },
+  "verification": {
+    "real_proof_acceptance_rate": "0.694",
+    "fake_proof_acceptance_rate": "0.05",
+    "verifier_discrimination_accuracy": "0.822",
+    "real_avg_confidence": 0.5030763149261475,
+    "fake_avg_confidence": 0.49441254138946533
+  },
+  "performance": {
+    "prover_inference_time_ms": 0.05388975143432617,
+    "verifier_inference_time_ms": 0.04546642303466797,
+    "adversary_inference_time_ms": 0.07279157638549805,
+    "total_proof_generation_time_ms": 0.05388975143432617,
+    "total_verification_time_ms": 0.04546642303466797
+  },
+  "complexity": {
+    "prover_parameters": 110090,
+    "verifier_parameters": 103169,
+    "adversary_parameters": 193098,
+    "total_parameters": 406357,
+    "prover_memory_mb": 0.41996002197265625,
+    "verifier_memory_mb": 0.3935585021972656,
+    "adversary_memory_mb": 0.7366104125976562,
+    "total_memory_mb": 1.5501289367675781
+  },
+  "robustness": {
+    "adversarial_robustness": 0.8399999737739563,
+    "average_confidence_change": 0.07938866317272186,
+    "perturbation_epsilon": 0.1
   }
 }
