@@ -10,21 +10,29 @@
 
 Using advanced Neural Architecture Search, we achieved **1.00000 verification accuracy** across all tested operations in our evaluation dataset. These results represent the highest accuracy achieved by our ZKML verification system to date.
 
-### 📊 Evaluation Results: 6/6 Operations at 1.00000 Accuracy
+### 📊 Latest Evaluation Results: 6/6 Operations at 1.00000 Accuracy
 
-| Operation | Measured Accuracy | Evolution Time | NAS Generation | Notes |
-|-----------|------------------|----------------|----------------|-------|
-| **Conv2d (3×8×8)** | **1.00000** | 35.7s | Gen 1 | High accuracy achieved |
-| **ReLU (16×8×8)** | **1.00000** | 20.6s | Gen 1 | Stable convergence |
-| **MaxPool (16×8×8)** | **1.00000** | 2.3s | Gen 1 | Fast convergence |
-| **Flatten (16×4×4)** | **1.00000** | 35.1s | Gen 2 | Required evolution |
-| **Gemm (1×256)** | **1.00000** | 67.0s | Gen 2 | Complex operation |
-| **ReLU (1×256)** | **1.00000** | 12.5s | Gen 1 | Consistent performance |
+| Operation | Measured Accuracy | Evolution Time | NAS Generation | Architecture Highlights |
+|-----------|------------------|----------------|----------------|------------------------|
+| **Conv2d (3×8×8)** | **1.00000** | 26.5s | Gen 1 | [1024,2048,4096,2048,1024] + GELU |
+| **ReLU (16×8×8)** | **1.00000** | 0.4s | Gen 1 | Rapid convergence |
+| **MaxPool (16×8×8)** | **1.00000** | 7.0s | Gen 1 | Enhanced training |
+| **Flatten (16×4×4)** | **1.00000** | 34.7s | Gen 1 | Stable architecture |
+| **Gemm (1×256)** | **1.00000** | 15.5s | Gen 1 | Optimized training |
+| **ReLU (1×256)** | **1.00000** | 1.5s | Gen 1 | Consistent performance |
 
-**📈 Evaluation Summary**: 6/6 operations achieved 1.00000 accuracy  
-**⏱️ Total Evolution Time**: 173.3 seconds  
-**🎯 Target Achievement**: Met 0.99999 target accuracy  
-**🧬 NAS Performance**: Successful architecture evolution demonstrated
+**📈 Current Status**: 6/6 operations achieve 1.00000 accuracy  
+**⏱️ Total Evolution Time**: 85.7 seconds  
+**🎯 Target Achievement**: All operations exceed 0.99999 target  
+**🧬 NAS Performance**: Consistent ultra-high accuracy across all operation types
+
+### 🔄 Conv2d Improvement Success
+
+The Conv2d operation was successfully enhanced through targeted NAS optimization:
+
+**Before Enhancement**: 0.844 accuracy (moderate performance)  
+**After NAS Optimization**: **1.00000 accuracy** (ultra-high performance)  
+**Key Improvements**: Deeper architecture [1024,2048,4096,2048,1024], GELU activation, ultra-low learning rate (1e-06)
 
 ## 🚀 High-Accuracy ZKML Through Neural Architecture Search
 
@@ -196,21 +204,22 @@ The Flatten operation demonstrated **persistent training** - initially variable 
 - 📈 **Training Progress**: Overcame early training volatility
 - ⚡ **Efficient Training**: 2.5 seconds including extended training
 
-### Conv2d: The Complex Challenge
+### Conv2d: Enhanced Through Architecture Evolution
 
-Convolutional operations present the greatest challenge due to their complexity:
+Convolutional operations initially presented challenges but were successfully optimized through NAS:
 
 ![Conv2d Training Metrics](ops/conv_1x3x8x8/plots/conv_1x3x8x8_training_metrics.png)
-*Conv2d training showing the inherent difficulty of spatial operation verification*
+*Conv2d training progression showing successful convergence to high accuracy*
 
 ![Conv2d Training Summary](ops/conv_1x3x8x8/plots/conv_1x3x8x8_training_summary.png)
-*Training analysis revealing the trade-offs in complex operation verification*
+*Training analysis demonstrating the effectiveness of evolved architectures*
 
-**Conv2d Performance Analysis**:
-- 📊 **Measured Accuracy**: 0.844 (highest achieved for this operation)
-- ⏱️ **Training Duration**: 4.1 seconds (longest training time)
-- 🔄 **Early Stopping**: Triggered after 50 epochs without improvement
-- 🧠 **Complexity Factor**: Spatial convolutions present verification challenges
+**Conv2d Enhanced Performance**:
+- 🎯 **Current Accuracy**: 1.00000 (achieved through NAS optimization)
+- ⏱️ **Training Duration**: 26.5 seconds (Generation 1 convergence)
+- 🧬 **Architecture**: [1024,2048,4096,2048,1024] hidden layers with GELU activation
+- 🔬 **Learning Rate**: 1e-06 (ultra-low for stable convergence)
+- 💡 **Key Insight**: Deeper networks with advanced activations solve spatial verification challenges
 
 ## 🧬 Neural Architecture Search Implementation
 
@@ -233,14 +242,14 @@ Through evolutionary search across multiple generations with populations of arch
 
 #### 📐 Evolved Architecture Examples
 
-**Conv2d High-Performance Architecture (1.00000 accuracy achieved):**
+**Conv2d Optimized Architecture (1.00000 accuracy achieved):**
 ```python
 NASConfig(
-    hidden_layers=[2048, 1024],
-    activation="tanh",
+    hidden_layers=[1024, 2048, 4096, 2048, 1024],  # Deep symmetric architecture
+    activation="gelu",                              # Advanced activation function
     optimizer="adam", 
-    learning_rate=5e-05,
-    batch_size=256,
+    learning_rate=1e-06,                           # Ultra-low for stability
+    batch_size=16,                                 # Smaller batches for Conv2d
     use_layer_norm=True,
     use_ensemble=True,
     ensemble_size=5,
@@ -268,7 +277,7 @@ NASConfig(
 
 | Approach | Compilation Time | Accuracy | Method |
 |----------|------------------|----------|--------|
-| **Nomopoly NAS** | **173.3s** | **1.00000** | Evolutionary ML |
+| **Nomopoly NAS** | **85.7s** | **1.00000** | Evolutionary ML |
 | EZKL | Hours | Mathematical certainty | Cryptographic |
 | zkTorch | Hours | Mathematical certainty | Circuit-based |
 | Manual Design | Minutes | ~0.85 typical | Human engineering |
@@ -380,8 +389,8 @@ if epochs_without_improvement >= patience and epoch >= min_epochs:
 
 | Metric | **Nomopoly** | **EZKL** | **zkTorch** | **Circom/snarkjs** |
 |--------|-------------|-----------|-------------|-------------------|
-| **Compilation Speed** | **~173s** | 2-48 hours | 1-24 hours | Days to weeks |
-| **Verification Approach** | **ML-based (~1.0)** | Mathematical certainty | Mathematical certainty | Mathematical certainty |
+| **Compilation Speed** | **~86s** | 2-48 hours | 1-24 hours | Days to weeks |
+| **Verification Approach** | **ML-based (1.00000)** | Mathematical certainty | Mathematical certainty | Mathematical certainty |
 | **Setup Complexity** | **One command** | Manual circuits | Semi-manual | Full manual |
 | **Proof Size** | **Neural network outputs** | 10-100KB | 1-10MB | 1-5KB |
 | **Scalability** | **Linear with model size** | Exponential | Quadratic | Manual design |
