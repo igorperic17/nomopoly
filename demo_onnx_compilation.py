@@ -77,18 +77,20 @@ def main():
     print("\n📊 Step 4: Operations Registry Status")
     ops_registry.print_registry_status()
     
-    # Step 5: Compile operations (with shorter training for demo)
-    print("\n⚙️ Step 5: Compiling Operations")
-    print("   🕐 Using reduced epochs for demo (100 instead of 200)")
+    # Step 5: Compile operations to 99% accuracy
+    print("\n⚙️ Step 5: Compiling Operations to 99% Accuracy")
+    print("   🎯 Training until 99% verifier accuracy (max 1000 epochs)")
     
     start_time = time.time()
     
     try:
         compilation_results = framework.compile_uncompiled_operations(
-            num_epochs=100,  # Reduced for demo
-            batch_size=16,   # Smaller batch for demo
-            proof_dim=16,    # Smaller proof dimension for demo
-            force_recompile=False
+            num_epochs=100,          # Minimum epochs before target check
+            batch_size=16,           # Smaller batch for demo
+            proof_dim=16,            # Smaller proof dimension for demo
+            force_recompile=True,    # Force recompile to reach 99%
+            target_accuracy=0.99,    # 99% target
+            max_epochs=1000          # Maximum to prevent infinite training
         )
         
         compilation_time = time.time() - start_time
@@ -178,7 +180,8 @@ def main():
     print(f"\n📊 Framework Features Demonstrated:")
     print(f"   ✅ ONNX model scanning and operation discovery")
     print(f"   ✅ Modular operation registry with metadata")
-    print(f"   ✅ Adversarial training for proof-capable components")
+    print(f"   ✅ Adversarial training to 99% verifier accuracy")
+    print(f"   ✅ Adaptive training with early stopping")
     print(f"   ✅ ONNX export of prover/verifier/adversary models")
     print(f"   ✅ Compilation progress tracking and logging")
     print(f"   ✅ Model validation and artifact management")

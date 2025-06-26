@@ -266,16 +266,20 @@ class ONNXOperationCompiler:
         op_info: OpCompilationInfo, 
         num_epochs: int = 200,
         batch_size: int = 32,
-        proof_dim: int = 32
+        proof_dim: int = 32,
+        target_accuracy: float = 0.99,
+        max_epochs: int = 1000
     ) -> Dict[str, Any]:
         """
         Compile a single ONNX operation into proof-capable components.
         
         Args:
             op_info: Operation information and metadata
-            num_epochs: Number of training epochs
+            num_epochs: Minimum number of training epochs (will continue until target_accuracy)
             batch_size: Training batch size
             proof_dim: Dimension of proof vectors
+            target_accuracy: Target verifier accuracy (default 99%)
+            max_epochs: Maximum number of epochs to prevent infinite training
             
         Returns:
             Dictionary with compilation results and metrics
@@ -322,10 +326,17 @@ class ONNXOperationCompiler:
             "adversary_fool_rate": []
         }
         
-        # Training loop
-        logger.info(f"Training for {num_epochs} epochs...")
+        # Training loop with target accuracy
+        logger.info(f"Training until {target_accuracy:.1%} accuracy (min {num_epochs}, max {max_epochs} epochs)...")
         
-        for epoch in tqdm(range(num_epochs), desc=f"Compiling {op_info.op_type.value}"):
+        best_accuracy = 0.0
+        epochs_without_improvement = 0
+        patience = 50  # Early stopping patience
+        
+        epoch = 0
+        pbar = tqdm(desc=f"Compiling {op_info.op_type.value}")
+        
+        while epoch < max_epochs:
             # Generate training data
             input_data = self._generate_input_data(op_info, batch_size)
             
@@ -387,12 +398,47 @@ class ONNXOperationCompiler:
                 metrics["verifier_accuracy"].append(verifier_acc)
                 metrics["adversary_fool_rate"].append(fool_rate)
             
+            # Update progress bar
+            pbar.set_postfix({
+                'Epoch': epoch + 1,
+                'Acc': f"{verifier_acc:.3f}",
+                'Target': f"{target_accuracy:.3f}",
+                'Best': f"{best_accuracy:.3f}"
+            })
+            pbar.update(1)
+            
+            # Check for improvement
+            if verifier_acc > best_accuracy:
+                best_accuracy = verifier_acc
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+            
             # Log progress
             if (epoch + 1) % 50 == 0:
                 logger.info(f"Epoch {epoch + 1}: Verifier Acc: {verifier_acc:.3f}, "
-                          f"Adversary Fool Rate: {fool_rate:.3f}")
+                          f"Adversary Fool Rate: {fool_rate:.3f}, Best: {best_accuracy:.3f}")
+            
+            # Check termination conditions
+            epoch += 1
+            
+            # Target accuracy reached and minimum epochs completed
+            if verifier_acc >= target_accuracy and epoch >= num_epochs:
+                logger.info(f"🎯 Target accuracy {target_accuracy:.1%} reached at epoch {epoch}!")
+                break
+                
+            # Early stopping if no improvement
+            if epochs_without_improvement >= patience and epoch >= num_epochs:
+                logger.info(f"⏹️  Early stopping: No improvement for {patience} epochs")
+                break
         
-        logger.info(f"Training completed! Final verifier accuracy: {metrics['verifier_accuracy'][-1]:.3f}")
+        pbar.close()
+        
+        final_accuracy = metrics['verifier_accuracy'][-1]
+        if final_accuracy >= target_accuracy:
+            logger.info(f"✅ Training completed! Target accuracy achieved: {final_accuracy:.3f}")
+        else:
+            logger.info(f"⚠️  Training completed at max epochs. Final accuracy: {final_accuracy:.3f} (target: {target_accuracy:.3f})")
         
         # === STEP 6: Export to ONNX ===
         dummy_input = self._generate_input_data(op_info, 1)

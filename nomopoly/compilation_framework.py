@@ -87,16 +87,20 @@ class ONNXCompilationFramework:
         num_epochs: int = 200,
         batch_size: int = 32,
         proof_dim: int = 32,
-        force_recompile: bool = False
+        force_recompile: bool = False,
+        target_accuracy: float = 0.99,
+        max_epochs: int = 1000
     ) -> Dict[str, Dict]:
         """
         Compile all uncompiled operations in the registry.
         
         Args:
-            num_epochs: Number of training epochs per operation
+            num_epochs: Minimum number of training epochs per operation
             batch_size: Training batch size
             proof_dim: Dimension of proof vectors
             force_recompile: If True, recompile even already compiled operations
+            target_accuracy: Target verifier accuracy (default 99%)
+            max_epochs: Maximum number of epochs to prevent infinite training
             
         Returns:
             Dictionary mapping operation names to compilation results
@@ -126,7 +130,9 @@ class ONNXCompilationFramework:
                     op_info=op_info,
                     num_epochs=num_epochs,
                     batch_size=batch_size,
-                    proof_dim=proof_dim
+                    proof_dim=proof_dim,
+                    target_accuracy=target_accuracy,
+                    max_epochs=max_epochs
                 )
                 
                 compilation_time = time.time() - start_time
@@ -175,17 +181,21 @@ class ONNXCompilationFramework:
         num_epochs: int = 200,
         batch_size: int = 32,
         proof_dim: int = 32,
-        force_recompile: bool = False
+        force_recompile: bool = False,
+        target_accuracy: float = 0.99,
+        max_epochs: int = 1000
     ) -> Dict[str, Dict]:
         """
         Complete workflow: scan a model and compile all its operations.
         
         Args:
             onnx_model_path: Path to ONNX model to process
-            num_epochs: Number of training epochs per operation
+            num_epochs: Minimum number of training epochs per operation
             batch_size: Training batch size
             proof_dim: Dimension of proof vectors
             force_recompile: If True, recompile even already compiled operations
+            target_accuracy: Target verifier accuracy (default 99%)
+            max_epochs: Maximum number of epochs to prevent infinite training
             
         Returns:
             Dictionary mapping operation names to compilation results
@@ -204,7 +214,9 @@ class ONNXCompilationFramework:
             num_epochs=num_epochs,
             batch_size=batch_size,
             proof_dim=proof_dim,
-            force_recompile=force_recompile
+            force_recompile=force_recompile,
+            target_accuracy=target_accuracy,
+            max_epochs=max_epochs
         )
         
         # Step 3: Print final registry status
