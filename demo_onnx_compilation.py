@@ -77,39 +77,53 @@ def main():
     print("\n📊 Step 4: Operations Registry Status")
     ops_registry.print_registry_status()
     
-    # Step 5: Compile operations to 99% accuracy
-    print("\n⚙️ Step 5: Compiling Operations to 99% Accuracy")
-    print("   🎯 Training until 99% verifier accuracy (max 1000 epochs)")
+    # Step 5: Compile operations to 99.99% accuracy (Ultra-Precision Mode)
+    print("\n⚙️ Step 5: Ultra-Precision Training to 99.99% Accuracy")
+    print("   🎯 Training until 99.99% verifier accuracy (4 nines precision)")
+    print("   🚀 Enhanced parameters for ultra-high precision")
     
     start_time = time.time()
     
     try:
         compilation_results = framework.compile_uncompiled_operations(
-            num_epochs=100,          # Minimum epochs before target check
-            batch_size=16,           # Smaller batch for demo
-            proof_dim=16,            # Smaller proof dimension for demo
-            force_recompile=True,    # Force recompile to reach 99%
-            target_accuracy=0.99,    # 99% target
-            max_epochs=1000          # Maximum to prevent infinite training
+            num_epochs=200,          # Higher minimum epochs for stability
+            batch_size=64,           # Larger batches for more stable gradients
+            proof_dim=64,            # Higher dimensional proofs for more information
+            force_recompile=True,    # Force recompile to reach 99.99%
+            target_accuracy=0.9999,  # 99.99% target (4 nines)
+            max_epochs=2000          # Extended training for ultra-precision
         )
         
         compilation_time = time.time() - start_time
         
-        print(f"\n✅ Compilation completed in {compilation_time:.1f}s")
-        print(f"📊 Results:")
+        print(f"\n🏆 Ultra-Precision Compilation completed in {compilation_time:.1f}s")
+        print(f"📊 Results (99.99% target):")
         
         successful = 0
         failed = 0
+        ultra_precision_achieved = 0
+        near_ultra_precision = 0
         
         for op_name, result in compilation_results.items():
             if result.get("success", False):
                 successful += 1
-                print(f"   ✅ {op_name}: Accuracy {result['final_verifier_accuracy']:.3f}")
+                accuracy = result['final_verifier_accuracy']
+                if accuracy >= 0.9999:
+                    ultra_precision_achieved += 1
+                    print(f"   🏆 {op_name}: Accuracy {accuracy:.4f} - ULTRA-PRECISION ACHIEVED!")
+                elif accuracy >= 0.99:
+                    near_ultra_precision += 1
+                    print(f"   🥇 {op_name}: Accuracy {accuracy:.4f} - Near Ultra-Precision")
+                else:
+                    print(f"   ✅ {op_name}: Accuracy {accuracy:.4f}")
             else:
                 failed += 1
                 print(f"   ❌ {op_name}: {result.get('error', 'Unknown error')}")
         
-        print(f"\n📈 Summary: {successful} successful, {failed} failed")
+        print(f"\n🎯 Ultra-Precision Summary:")
+        print(f"   🏆 Ultra-Precision (≥99.99%): {ultra_precision_achieved} operations")
+        print(f"   🥇 Near Ultra-Precision (≥99%): {near_ultra_precision} operations")
+        print(f"   ✅ Total successful: {successful}, ❌ Failed: {failed}")
         
     except Exception as e:
         print(f"❌ Compilation error: {e}")

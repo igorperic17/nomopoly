@@ -314,9 +314,22 @@ class ONNXOperationCompiler:
             param.requires_grad = False
         
         # Optimizers
-        verifier_optimizer = optim.Adam(verifier.parameters(), lr=0.002)
-        adversary_optimizer = optim.Adam(adversary.parameters(), lr=0.0005)
-        prover_proof_optimizer = optim.Adam(prover.proof_generator.parameters(), lr=0.001)
+        # Adaptive learning rates for ultra-high precision
+        base_verifier_lr = 0.001 if target_accuracy >= 0.999 else 0.002
+        base_adversary_lr = 0.0002 if target_accuracy >= 0.999 else 0.0005
+        base_prover_lr = 0.0005 if target_accuracy >= 0.999 else 0.001
+        
+        verifier_optimizer = optim.Adam(verifier.parameters(), lr=base_verifier_lr, weight_decay=1e-5)
+        adversary_optimizer = optim.Adam(adversary.parameters(), lr=base_adversary_lr, weight_decay=1e-5)
+        prover_proof_optimizer = optim.Adam(prover.proof_generator.parameters(), lr=base_prover_lr, weight_decay=1e-5)
+        
+        # Learning rate schedulers for ultra-high precision
+        verifier_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            verifier_optimizer, mode='max', factor=0.8, patience=30, min_lr=1e-6
+        )
+        adversary_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            adversary_optimizer, mode='min', factor=0.8, patience=30, min_lr=1e-6
+        )
         
         # Training metrics
         metrics = {
@@ -327,11 +340,11 @@ class ONNXOperationCompiler:
         }
         
         # Training loop with target accuracy
-        logger.info(f"Training until {target_accuracy:.1%} accuracy (min {num_epochs}, max {max_epochs} epochs)...")
+        logger.info(f"Training until {target_accuracy:.2%} accuracy (min {num_epochs}, max {max_epochs} epochs)...")
         
         best_accuracy = 0.0
         epochs_without_improvement = 0
-        patience = 50  # Early stopping patience
+        patience = 100 if target_accuracy >= 0.999 else 50  # Extended patience for ultra-high precision
         
         epoch = 0
         pbar = tqdm(desc=f"Compiling {op_info.op_type.value}")
@@ -401,9 +414,9 @@ class ONNXOperationCompiler:
             # Update progress bar
             pbar.set_postfix({
                 'Epoch': epoch + 1,
-                'Acc': f"{verifier_acc:.3f}",
-                'Target': f"{target_accuracy:.3f}",
-                'Best': f"{best_accuracy:.3f}"
+                'Acc': f"{verifier_acc:.4f}",
+                'Target': f"{target_accuracy:.4f}",
+                'Best': f"{best_accuracy:.4f}"
             })
             pbar.update(1)
             
@@ -414,17 +427,26 @@ class ONNXOperationCompiler:
             else:
                 epochs_without_improvement += 1
             
+            # Update learning rate schedulers for ultra-high precision
+            if target_accuracy >= 0.999:
+                verifier_scheduler.step(verifier_acc)
+                adversary_scheduler.step(metrics["adversary_loss"][-1] if metrics["adversary_loss"] else 1.0)
+            
             # Log progress
             if (epoch + 1) % 50 == 0:
-                logger.info(f"Epoch {epoch + 1}: Verifier Acc: {verifier_acc:.3f}, "
-                          f"Adversary Fool Rate: {fool_rate:.3f}, Best: {best_accuracy:.3f}")
+                current_verifier_lr = verifier_optimizer.param_groups[0]['lr']
+                logger.info(f"Epoch {epoch + 1}: Verifier Acc: {verifier_acc:.4f}, "
+                          f"Adversary Fool Rate: {fool_rate:.3f}, Best: {best_accuracy:.4f}, LR: {current_verifier_lr:.2e}")
             
             # Check termination conditions
             epoch += 1
             
             # Target accuracy reached and minimum epochs completed
             if verifier_acc >= target_accuracy and epoch >= num_epochs:
-                logger.info(f"🎯 Target accuracy {target_accuracy:.1%} reached at epoch {epoch}!")
+                if target_accuracy >= 0.999:
+                    logger.info(f"🏆 ULTRA-PRECISION ACHIEVED! {target_accuracy:.2%} accuracy reached at epoch {epoch}!")
+                else:
+                    logger.info(f"🎯 Target accuracy {target_accuracy:.1%} reached at epoch {epoch}!")
                 break
                 
             # Early stopping if no improvement
@@ -436,9 +458,13 @@ class ONNXOperationCompiler:
         
         final_accuracy = metrics['verifier_accuracy'][-1]
         if final_accuracy >= target_accuracy:
-            logger.info(f"✅ Training completed! Target accuracy achieved: {final_accuracy:.3f}")
+            if target_accuracy >= 0.999:
+                logger.info(f"🏆 ULTRA-PRECISION TRAINING COMPLETE! Achieved: {final_accuracy:.4f} (target: {target_accuracy:.4f})")
+            else:
+                logger.info(f"✅ Training completed! Target accuracy achieved: {final_accuracy:.3f}")
         else:
-            logger.info(f"⚠️  Training completed at max epochs. Final accuracy: {final_accuracy:.3f} (target: {target_accuracy:.3f})")
+            precision_str = f"{target_accuracy:.4f}" if target_accuracy >= 0.999 else f"{target_accuracy:.3f}"
+            logger.info(f"⚠️  Training completed at max epochs. Final accuracy: {final_accuracy:.4f} (target: {precision_str})")
         
         # === STEP 6: Export to ONNX ===
         dummy_input = self._generate_input_data(op_info, 1)
