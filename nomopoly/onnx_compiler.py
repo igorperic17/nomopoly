@@ -20,6 +20,7 @@ import logging
 import os
 import json
 from datetime import datetime
+import matplotlib.pyplot as plt
 
 from .ops_registry import OpCompilationInfo, SupportedOp
 from .utils import convert_pytorch_to_onnx, validate_onnx_model
@@ -130,13 +131,24 @@ class ONNXOperationWrapper(nn.Module):
             # Default identity operation
             return nn.Identity()
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Execute the operation."""
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Execute the operation AND generate proof in one forward pass.
+        
+        Returns:
+            Tuple[output, proof] - Original operation output + authenticity proof
+        """
+        # Execute the original operation
         if self.op_info.op_type == SupportedOp.ADD:
             # For Add operation, we need two inputs - use x + x for demo
-            return self.operation(x) + x
+            output = self.operation(x) + x
         else:
-            return self.operation(x)
+            output = self.operation(x)
+        
+        # Generate proof for this execution
+        proof = self.generate_proof(x, output)
+        
+        return output, proof
     
     def generate_proof(self, input_tensor: torch.Tensor, output_tensor: torch.Tensor) -> torch.Tensor:
         """Generate an authentic proof for the operation execution."""
@@ -144,6 +156,13 @@ class ONNXOperationWrapper(nn.Module):
         output_flat = output_tensor.view(output_tensor.shape[0], -1)
         combined = torch.cat([input_flat, output_flat], dim=-1)
         return self.proof_generator(combined)
+    
+    def execute_only(self, x: torch.Tensor) -> torch.Tensor:
+        """Execute only the operation (for backward compatibility)."""
+        if self.op_info.op_type == SupportedOp.ADD:
+            return self.operation(x) + x
+        else:
+            return self.operation(x)
 
 
 class ONNXVerifier(nn.Module):
@@ -312,8 +331,7 @@ class ONNXOperationCompiler:
             
             # === STEP 1: Generate real examples ===
             with torch.no_grad():
-                real_output = prover.forward(input_data)
-            real_proof = prover.generate_proof(input_data, real_output)
+                real_output, real_proof = prover.forward(input_data)
             
             # === STEP 2: Generate fake examples ===
             fake_output, fake_proof = adversary(input_data)
@@ -347,8 +365,7 @@ class ONNXOperationCompiler:
             prover_proof_optimizer.zero_grad()
             
             # Generate fresh real samples for prover training
-            fresh_real_output = prover.forward(input_data)
-            fresh_real_proof = prover.generate_proof(input_data, fresh_real_output)
+            fresh_real_output, fresh_real_proof = prover.forward(input_data)
             fresh_real_scores = verifier(input_data, fresh_real_output.detach(), fresh_real_proof)
             prover_proof_loss = self.criterion(fresh_real_scores, torch.ones_like(fresh_real_scores))
             prover_proof_loss.backward()
@@ -387,8 +404,7 @@ class ONNXOperationCompiler:
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
             
             # Export prover
-            dummy_output = prover.forward(dummy_input)
-            dummy_proof = prover.generate_proof(dummy_input, dummy_output)
+            dummy_output, dummy_proof = prover.forward(dummy_input)
             
             self._export_prover_onnx(prover, dummy_input, op_info.prover_onnx_path)
             self._export_verifier_onnx(verifier, dummy_input, dummy_output, dummy_proof, op_info.verifier_onnx_path)
@@ -406,6 +422,9 @@ class ONNXOperationCompiler:
             json.dump(metrics, f, indent=2)
         
         logger.info(f"📊 Saved training metrics to {metrics_path}")
+        
+        # Generate training plots
+        self._plot_training_metrics(op_info, metrics, logger)
         
         # Update op_info
         op_info.training_metrics = metrics
@@ -427,20 +446,9 @@ class ONNXOperationCompiler:
         """Export prover to ONNX format."""
         prover.eval()
         
-        class ProverWrapper(nn.Module):
-            def __init__(self, prover_net):
-                super().__init__()
-                self.prover = prover_net
-            
-            def forward(self, x):
-                output = self.prover.forward(x)
-                proof = self.prover.generate_proof(x, output)
-                return output, proof
-        
-        wrapper = ProverWrapper(prover)
-        
+        # The prover now directly returns (output, proof) tuple
         torch.onnx.export(
-            wrapper,
+            prover,
             dummy_input,
             output_path,
             export_params=True,
@@ -492,4 +500,145 @@ class ONNXOperationCompiler:
                 'fake_output': {0: 'batch_size'},
                 'fake_proof': {0: 'batch_size'}
             }
-        ) 
+        )
+    
+    def _plot_training_metrics(self, op_info: OpCompilationInfo, metrics: Dict[str, List], logger):
+        """Generate comprehensive training plots for adversarial setup."""
+        try:
+            # Create plots directory in the operation folder
+            from pathlib import Path
+            op_folder = Path(op_info.compilation_log_path).parent
+            plots_dir = op_folder / "plots"
+            plots_dir.mkdir(exist_ok=True)
+            
+            # Set up the plotting style
+            plt.style.use('default')
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+            fig.suptitle(f'Adversarial Training Metrics: {op_info.folder_name}', fontsize=16, fontweight='bold')
+            
+            epochs = range(1, len(metrics['verifier_loss']) + 1)
+            
+            # Plot 1: Loss curves
+            ax1.plot(epochs, metrics['verifier_loss'], 'b-', label='Verifier Loss', linewidth=2)
+            ax1.plot(epochs, metrics['adversary_loss'], 'r-', label='Adversary Loss', linewidth=2)
+            ax1.set_xlabel('Epoch')
+            ax1.set_ylabel('Loss')
+            ax1.set_title('Training Loss Curves')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+            
+            # Plot 2: Verifier accuracy over time
+            ax2.plot(epochs, [acc * 100 for acc in metrics['verifier_accuracy']], 'g-', linewidth=2)
+            ax2.set_xlabel('Epoch')
+            ax2.set_ylabel('Accuracy (%)')
+            ax2.set_title('Verifier Accuracy')
+            ax2.grid(True, alpha=0.3)
+            ax2.set_ylim(0, 105)
+            
+            # Add horizontal line at 50% (random guessing)
+            ax2.axhline(y=50, color='gray', linestyle='--', alpha=0.7, label='Random Baseline')
+            ax2.legend()
+            
+            # Plot 3: Adversary fool rate
+            ax3.plot(epochs, [rate * 100 for rate in metrics['adversary_fool_rate']], 'orange', linewidth=2)
+            ax3.set_xlabel('Epoch')
+            ax3.set_ylabel('Fool Rate (%)')
+            ax3.set_title('Adversary Success Rate (Fooling Verifier)')
+            ax3.grid(True, alpha=0.3)
+            ax3.set_ylim(0, 105)
+            
+            # Plot 4: Adversarial dynamics (accuracy vs fool rate)
+            ax4.scatter([acc * 100 for acc in metrics['verifier_accuracy']], 
+                       [rate * 100 for rate in metrics['adversary_fool_rate']], 
+                       c=epochs, cmap='viridis', alpha=0.7, s=20)
+            ax4.set_xlabel('Verifier Accuracy (%)')
+            ax4.set_ylabel('Adversary Fool Rate (%)')
+            ax4.set_title('Adversarial Dynamics (Color = Epoch)')
+            ax4.grid(True, alpha=0.3)
+            
+            # Add colorbar for the scatter plot
+            cbar = plt.colorbar(ax4.collections[0], ax=ax4)
+            cbar.set_label('Epoch')
+            
+            # Add final performance annotations
+            final_acc = metrics['verifier_accuracy'][-1] * 100
+            final_fool = metrics['adversary_fool_rate'][-1] * 100
+            
+            # Annotate final performance
+            ax2.annotate(f'Final: {final_acc:.1f}%', 
+                        xy=(len(epochs), final_acc), xytext=(len(epochs)*0.7, final_acc + 10),
+                        arrowprops=dict(arrowstyle='->', color='green', alpha=0.7),
+                        fontsize=10, fontweight='bold')
+            
+            ax3.annotate(f'Final: {final_fool:.1f}%', 
+                        xy=(len(epochs), final_fool), xytext=(len(epochs)*0.7, final_fool + 10),
+                        arrowprops=dict(arrowstyle='->', color='orange', alpha=0.7),
+                        fontsize=10, fontweight='bold')
+            
+            plt.tight_layout()
+            
+            # Save the plot
+            plot_path = plots_dir / f"{op_info.folder_name}_training_metrics.png"
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            logger.info(f"📈 Saved training plots to {plot_path}")
+            
+            # Generate a summary statistics plot
+            self._plot_training_summary(op_info, metrics, plots_dir, logger)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to generate training plots: {e}")
+    
+    def _plot_training_summary(self, op_info: OpCompilationInfo, metrics: Dict[str, List], plots_dir, logger):
+        """Generate a summary statistics plot."""
+        try:
+            fig, ax = plt.subplots(1, 1, figsize=(10, 6))
+            
+            # Calculate moving averages for smoother trends
+            window_size = max(1, len(metrics['verifier_accuracy']) // 10)
+            
+            def moving_average(data, window):
+                return [np.mean(data[max(0, i-window):i+1]) for i in range(len(data))]
+            
+            epochs = range(1, len(metrics['verifier_accuracy']) + 1)
+            
+            verifier_smooth = moving_average(metrics['verifier_accuracy'], window_size)
+            adversary_smooth = moving_average(metrics['adversary_fool_rate'], window_size)
+            
+            # Plot smoothed curves
+            ax.plot(epochs, [acc * 100 for acc in verifier_smooth], 'b-', linewidth=3, label='Verifier Accuracy (smoothed)')
+            ax.plot(epochs, [100 - rate * 100 for rate in adversary_smooth], 'r-', linewidth=3, label='Verifier Robustness (smoothed)')
+            
+            # Add raw data as lighter lines
+            ax.plot(epochs, [acc * 100 for acc in metrics['verifier_accuracy']], 'b-', alpha=0.3, linewidth=1)
+            ax.plot(epochs, [100 - rate * 100 for rate in metrics['adversary_fool_rate']], 'r-', alpha=0.3, linewidth=1)
+            
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('Percentage (%)')
+            ax.set_title(f'Training Summary: {op_info.folder_name}\n'
+                        f'Operation: {op_info.op_type.value} | Input: {op_info.input_shape} → Output: {op_info.output_shape}')
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+            ax.set_ylim(0, 105)
+            
+            # Add performance statistics
+            final_acc = metrics['verifier_accuracy'][-1] * 100
+            final_robust = (1 - metrics['adversary_fool_rate'][-1]) * 100
+            avg_acc = np.mean(metrics['verifier_accuracy']) * 100
+            
+            stats_text = f'Final Accuracy: {final_acc:.1f}%\nFinal Robustness: {final_robust:.1f}%\nAvg Accuracy: {avg_acc:.1f}%'
+            ax.text(0.02, 0.98, stats_text, transform=ax.transAxes, 
+                   verticalalignment='top', bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+            
+            plt.tight_layout()
+            
+            # Save the summary plot
+            summary_path = plots_dir / f"{op_info.folder_name}_training_summary.png"
+            plt.savefig(summary_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            logger.info(f"📈 Saved training summary to {summary_path}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to generate summary plot: {e}") 

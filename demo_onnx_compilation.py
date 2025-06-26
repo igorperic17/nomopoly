@@ -142,7 +142,14 @@ def main():
             if item.is_dir():
                 print(f"     {item.name}/")
                 for subitem in sorted(item.iterdir()):
-                    print(f"       {subitem.name}")
+                    if subitem.is_dir():
+                        print(f"       {subitem.name}/")
+                        # Show plots if they exist
+                        if subitem.name == "plots":
+                            for plot_file in sorted(subitem.iterdir()):
+                                print(f"         {plot_file.name}")
+                    else:
+                        print(f"       {subitem.name}")
     
     print("   compiled_ops/")
     if framework.compiled_ops_dir.exists():
@@ -182,6 +189,7 @@ def main():
     print(f"   ✅ ONNX export of prover/verifier/adversary models")
     print(f"   ✅ Compilation progress tracking and logging")
     print(f"   ✅ Model validation and artifact management")
+    print(f"   ✅ Comprehensive training plots for adversarial analysis")
 
 
 def cleanup_demo_files():
