@@ -1,46 +1,13 @@
 """
-Nomopoly: Zero Knowledge Machine Learning Framework with Holographic Reduced Representations
+Nomopoly: ONNX Operation Compilation Framework
 
-A framework for training neural networks with zero-knowledge proof capabilities,
-featuring fixed-size proofs using HRR and GAN-inspired adversarial training.
+A framework for compiling ONNX operations into proof-capable components with
+adversarial training for zero-knowledge machine learning.
 """
 
-from .networks import (
-    HolographicMemory,
-    HolographicWrapper,
-    OriginalMNISTNet,
-    ZKProverNet, 
-    ZKVerifierNet, 
-    ZKAdversarialNet,
-    create_holographic_model,
-    SimpleONNXComputation,
-    # Per-layer verifiable training
-    VerifiableLayer,
-    VerifiableLinear,
-    VerifiableReLU,
-    VerifiableConv2d
-)
-
-from .training import ZKTrainer
-
-from .layer_training import (
-    LayerTrainer,
-    MultiLayerTrainer,
-    SimpleVerifiableNet,
-    create_demo_verifiable_network
-)
-
-from .plotting import ZKPlotter, create_training_plots
-
-from .inference import ZKInference, run_inference_analysis
-
-from .benchmarks import ZKBenchmark
-
 from .utils import (
-    create_simple_onnx_graph,
     convert_pytorch_to_onnx,
-    validate_onnx_model,
-    OnnxHandler
+    validate_onnx_model
 )
 
 from .ops_registry import (
@@ -62,54 +29,14 @@ from .compilation_framework import (
     compilation_framework
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __author__ = "Nomopoly Team"
-__description__ = "Zero Knowledge Machine Learning with Holographic Reduced Representations"
+__description__ = "ONNX Operation Compilation Framework for Zero Knowledge Machine Learning"
 
 __all__ = [
-    # Core HRR components
-    "HolographicMemory",
-    "HolographicWrapper", 
-    "create_holographic_model",
-    
-    # Network architectures
-    "OriginalMNISTNet",
-    "ZKProverNet",
-    "ZKVerifierNet", 
-    "ZKAdversarialNet",
-    "SimpleONNXComputation",
-    
-    # Per-layer verifiable training
-    "VerifiableLayer",
-    "VerifiableLinear",
-    "VerifiableReLU",
-    "VerifiableConv2d",
-    
-    # Training system
-    "ZKTrainer",
-    
-    # Per-layer training system
-    "LayerTrainer",
-    "MultiLayerTrainer", 
-    "SimpleVerifiableNet",
-    "create_demo_verifiable_network",
-    
-    # Plotting and visualization
-    "ZKPlotter",
-    "create_training_plots",
-    
-    # Inference and analysis
-    "ZKInference",
-    "run_inference_analysis",
-    
-    # Benchmarking
-    "ZKBenchmark",
-    
     # Utilities
-    "create_simple_onnx_graph",
     "convert_pytorch_to_onnx", 
     "validate_onnx_model",
-    "OnnxHandler",
     
     # ONNX Operations Registry
     "SupportedOp",

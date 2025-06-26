@@ -31,16 +31,13 @@ class ONNXCompilationFramework:
     def __init__(
         self,
         ops_dir: str = "ops",
-        compiled_ops_dir: str = "compiled_ops", 
         device: str = "mps"
     ):
         self.ops_dir = Path(ops_dir)
-        self.compiled_ops_dir = Path(compiled_ops_dir)
         self.device = device
         
-        # Create directories
+        # Create operations directory
         self.ops_dir.mkdir(exist_ok=True)
-        self.compiled_ops_dir.mkdir(exist_ok=True)
         
         # Initialize compiler
         self.compiler = ONNXOperationCompiler(device=device)

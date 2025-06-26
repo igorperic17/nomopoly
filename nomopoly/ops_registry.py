@@ -69,11 +69,9 @@ class OpCompilationInfo:
 class OpsRegistry:
     """Registry for managing supported operations and their compilation status."""
     
-    def __init__(self, ops_dir: str = "ops", compiled_ops_dir: str = "compiled_ops"):
+    def __init__(self, ops_dir: str = "ops"):
         self.ops_dir = Path(ops_dir)
-        self.compiled_ops_dir = Path(compiled_ops_dir)
         self.ops_dir.mkdir(exist_ok=True)
-        self.compiled_ops_dir.mkdir(exist_ok=True)
         
         # Registry of discovered operations
         self.discovered_ops: Dict[str, OpCompilationInfo] = {}
@@ -110,11 +108,11 @@ class OpsRegistry:
         op_folder = self.ops_dir / op_info.folder_name
         op_folder.mkdir(parents=True, exist_ok=True)
         
-        # Set file paths
+        # Set file paths - everything now goes in the operation folder
         op_info.base_onnx_path = str(op_folder / f"{op_info.folder_name}.onnx")
-        op_info.prover_onnx_path = str(self.compiled_ops_dir / f"{op_info.folder_name}_prover.onnx")
-        op_info.verifier_onnx_path = str(self.compiled_ops_dir / f"{op_info.folder_name}_verifier.onnx")
-        op_info.adversary_onnx_path = str(self.compiled_ops_dir / f"{op_info.folder_name}_adversary.onnx")
+        op_info.prover_onnx_path = str(op_folder / f"{op_info.folder_name}_prover.onnx")
+        op_info.verifier_onnx_path = str(op_folder / f"{op_info.folder_name}_verifier.onnx")
+        op_info.adversary_onnx_path = str(op_folder / f"{op_info.folder_name}_adversary.onnx")
         op_info.compilation_log_path = str(op_folder / "compilation.log")
         
         # Check if already compiled

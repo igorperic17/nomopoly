@@ -47,12 +47,10 @@ def main():
     # Create a custom framework instance for demo (could also use global one)
     framework = ONNXCompilationFramework(
         ops_dir="ops",
-        compiled_ops_dir="compiled_ops",
         device="mps"  # Use MPS for Apple Silicon, fallback to CPU
     )
     
     print(f"   📁 Operations directory: {framework.ops_dir}")
-    print(f"   📁 Compiled operations directory: {framework.compiled_ops_dir}")
     print(f"   🖥️  Device: {framework.device}")
     
     # Step 3: Scan the ONNX model
@@ -144,22 +142,16 @@ def main():
                 for subitem in sorted(item.iterdir()):
                     if subitem.is_dir():
                         print(f"       {subitem.name}/")
-                        # Show plots if they exist
-                        if subitem.name == "plots":
-                            for plot_file in sorted(subitem.iterdir()):
-                                print(f"         {plot_file.name}")
+                        # Show contents of subdirectories (like plots)
+                        for plot_file in sorted(subitem.iterdir()):
+                            print(f"         {plot_file.name}")
                     else:
-                        print(f"       {subitem.name}")
-    
-    print("   compiled_ops/")
-    if framework.compiled_ops_dir.exists():
-        onnx_files = list(framework.compiled_ops_dir.glob("*.onnx"))
-        if onnx_files:
-            for onnx_file in sorted(onnx_files):
-                file_size = onnx_file.stat().st_size / 1024  # KB
-                print(f"     {onnx_file.name} ({file_size:.1f} KB)")
-        else:
-            print("     (no ONNX files)")
+                        # Show file with size if it's an ONNX file
+                        if subitem.suffix == '.onnx':
+                            file_size = subitem.stat().st_size / 1024  # KB
+                            print(f"       {subitem.name} ({file_size:.1f} KB)")
+                        else:
+                            print(f"       {subitem.name}")
     
     # Step 9: Summary
     print("\n🎯 Demo Summary")
@@ -172,12 +164,13 @@ def main():
     print(f"⏳ Still need compilation: {len(uncompiled_ops)} operations")
     
     if compiled_ops:
-        print("\n📦 Generated ONNX Models:")
+        print("\n📦 Generated ONNX Models (all in operation folders):")
         for op in compiled_ops:
             print(f"   🔧 {op.folder_name}:")
             print(f"      Prover: {Path(op.prover_onnx_path).name}")
             print(f"      Verifier: {Path(op.verifier_onnx_path).name}")
             print(f"      Adversary: {Path(op.adversary_onnx_path).name}")
+            print(f"      Location: ops/{op.folder_name}/")
     
     print(f"\n⚠️  IMPORTANT: All models compiled with fixed input dimensions!")
     print(f"   Models will break if input shapes differ during inference.")
@@ -201,8 +194,7 @@ def cleanup_demo_files():
     ]
     
     dirs_to_remove = [
-        "ops",
-        "compiled_ops"
+        "ops"
     ]
     
     for file_path in files_to_remove:

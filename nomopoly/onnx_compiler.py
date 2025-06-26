@@ -398,7 +398,7 @@ class ONNXOperationCompiler:
         dummy_input = self._generate_input_data(op_info, 1)
         
         try:
-            # Ensure output directories exist
+            # Ensure output directories exist (all paths should now be in the operation folder)
             from pathlib import Path
             for path in [op_info.prover_onnx_path, op_info.verifier_onnx_path, op_info.adversary_onnx_path]:
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
