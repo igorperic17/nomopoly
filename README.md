@@ -1,49 +1,49 @@
 # 🔐 Nomopoly - Modular Zero Knowledge ONNX Compiler
 
-> **"What if we could achieve PERFECT 100% verification accuracy through Neural Architecture Search?"**
+> **"What if we could achieve ultra-high verification accuracy through Neural Architecture Search?"**
 
-**Nomopoly** is a breakthrough modular ONNX operation compiler that creates Zero Knowledge Machine Learning (ZKML) systems through **Neural Architecture Search (NAS)** and **adversarial training**. Instead of compiling entire networks, Nomopoly provides drop-in replacement ONNX operations that generate cryptographic authenticity proofs while maintaining identical computational results.
+**Nomopoly** is a modular ONNX operation compiler that creates Zero Knowledge Machine Learning (ZKML) systems through **Neural Architecture Search (NAS)** and **adversarial training**. Instead of compiling entire networks, Nomopoly provides drop-in replacement ONNX operations that generate authenticity proofs while maintaining identical computational results.
 
-## 🏆 BREAKTHROUGH: 100% Ultra-Precision Achievement
+## 🧬 Neural Architecture Search Results
 
-**Latest NAS Evolution Results - PERFECT ACCURACY ACHIEVED!**
+**Latest NAS Evolution Results - Ultra-High Accuracy Achieved**
 
-We've achieved the impossible: **100% verification accuracy** across all operations using advanced Neural Architecture Search. This represents the first ZKML system to demonstrate **flawless verification capabilities**.
+Using advanced Neural Architecture Search, we achieved **1.00000 verification accuracy** across all tested operations in our evaluation dataset. These results represent the highest accuracy achieved by our ZKML verification system to date.
 
-### 🎯 Perfect Score: 6/6 Operations at 100% Accuracy
+### 📊 Evaluation Results: 6/6 Operations at 1.00000 Accuracy
 
-| Operation | Accuracy | Evolution Time | NAS Generation | Status |
-|-----------|----------|----------------|----------------|--------|
-| **Conv2d (3×8×8)** | **100.000%** ✨ | 35.7s | Gen 1 | 🏆 PERFECT |
-| **ReLU (16×8×8)** | **100.000%** ✨ | 20.6s | Gen 1 | 🏆 PERFECT |
-| **MaxPool (16×8×8)** | **100.000%** ✨ | 2.3s | Gen 1 | 🏆 PERFECT |
-| **Flatten (16×4×4)** | **100.000%** ✨ | 35.1s | Gen 2 | 🏆 PERFECT |
-| **Gemm (1×256)** | **100.000%** ✨ | 67.0s | Gen 2 | 🏆 PERFECT |
-| **ReLU (1×256)** | **100.000%** ✨ | 12.5s | Gen 1 | 🏆 PERFECT |
+| Operation | Measured Accuracy | Evolution Time | NAS Generation | Notes |
+|-----------|------------------|----------------|----------------|-------|
+| **Conv2d (3×8×8)** | **1.00000** | 35.7s | Gen 1 | High accuracy achieved |
+| **ReLU (16×8×8)** | **1.00000** | 20.6s | Gen 1 | Stable convergence |
+| **MaxPool (16×8×8)** | **1.00000** | 2.3s | Gen 1 | Fast convergence |
+| **Flatten (16×4×4)** | **1.00000** | 35.1s | Gen 2 | Required evolution |
+| **Gemm (1×256)** | **1.00000** | 67.0s | Gen 2 | Complex operation |
+| **ReLU (1×256)** | **1.00000** | 12.5s | Gen 1 | Consistent performance |
 
-**🎊 ULTRA-PRECISION ACHIEVEMENT**: 6/6 operations (100% success rate)  
-**⏱️ Total Evolution Time**: 173.3 seconds (~3 minutes)  
-**🚀 EXCEEDED TARGET**: 100.000% vs 99.999% target  
-**🧬 NAS SUCCESS**: First ZKML system to achieve perfect verification through evolution
+**📈 Evaluation Summary**: 6/6 operations achieved 1.00000 accuracy  
+**⏱️ Total Evolution Time**: 173.3 seconds  
+**🎯 Target Achievement**: Met 0.99999 target accuracy  
+**🧬 NAS Performance**: Successful architecture evolution demonstrated
 
-## 🚀 The 99% Accuracy Revolution
+## 🚀 High-Accuracy ZKML Through Neural Architecture Search
 
-Traditional ZKML approaches face a fundamental trade-off: **security vs speed**. EZKL and zkTorch provide mathematical certainty but require hours of compilation. Nomopoly breaks this paradigm with **adaptive adversarial training** that achieves **96.4% average verification accuracy in just 16.8 seconds**.
+Traditional ZKML approaches face a fundamental trade-off: **security vs speed**. EZKL and zkTorch provide mathematical certainty but require hours of compilation. Nomopoly explores **adaptive adversarial training** combined with **Neural Architecture Search** to achieve high verification accuracy in seconds.
 
-### ⚡ Lightning Results: 4/6 Operations at 100% Perfect Accuracy
+### ⚡ Previous Results: Baseline Adaptive Training
 
-Our latest compilation run demonstrates the power of adaptive training:
+Earlier compilation runs demonstrated adaptive training capabilities:
 
-| Operation | Final Accuracy | Training Epochs | Time | Achievement |
-|-----------|---------------|-----------------|------|-------------|
-| **ReLU (16×8×8)** | **100.0%** ✨ | 100 | 2.9s | 🏆 Perfect |
-| **Flatten (16×4×4)** | **100.0%** ✨ | 108 | 2.5s | 🏆 Perfect |  
-| **Gemm (1×256)** | **100.0%** ✨ | 100 | 2.3s | 🏆 Perfect |
-| **ReLU (1×256)** | **100.0%** ✨ | 100 | 2.5s | 🏆 Perfect |
-| **MaxPool (16×8×8)** | **93.8%** | 100 | 2.5s | 🥇 Excellent |
-| **Conv2d (3×8×8)** | **84.4%** | 100 | 4.1s | 🥈 Good |
+| Operation | Measured Accuracy | Training Epochs | Time | Performance |
+|-----------|------------------|-----------------|------|-------------|
+| **ReLU (16×8×8)** | **1.0000** | 100 | 2.9s | Excellent |
+| **Flatten (16×4×4)** | **1.0000** | 108 | 2.5s | Excellent |  
+| **Gemm (1×256)** | **1.0000** | 100 | 2.3s | Excellent |
+| **ReLU (1×256)** | **1.0000** | 100 | 2.5s | Excellent |
+| **MaxPool (16×8×8)** | **0.938** | 100 | 2.5s | Good |
+| **Conv2d (3×8×8)** | **0.844** | 100 | 4.1s | Moderate |
 
-**🎯 Result**: 66.7% of operations achieved perfect 100% accuracy, with an average of 96.4%
+**📈 Baseline Summary**: 4/6 operations achieved 1.0000 accuracy, with 0.964 average
 
 ## ✨ Key Features
 
@@ -164,37 +164,37 @@ python demo_onnx_compilation.py
 
 ## 📊 Training Performance Deep Dive
 
-### The ReLU Success Story: 100% in 100 Epochs
+### The ReLU Training Example: 1.0000 Accuracy in 100 Epochs
 
-Our ReLU operation achieved **perfect 100% verification accuracy** in exactly 100 epochs. Here's what the training looked like:
+Our ReLU operation achieved **1.0000 verification accuracy** in 100 epochs. Here's what the training looked like:
 
 ![ReLU Training Metrics](ops/relu_1x16x8x8/plots/relu_1x16x8x8_training_metrics.png)
-*Real-time training showing the verifier rapidly learning to distinguish authentic vs fake proofs, achieving 100% accuracy*
+*Real-time training showing the verifier learning to distinguish authentic vs fake proofs, achieving 1.0000 accuracy*
 
 ![ReLU Training Summary](ops/relu_1x16x8x8/plots/relu_1x16x8x8_training_summary.png)  
-*Training summary demonstrating consistent convergence to perfect verification*
+*Training summary demonstrating consistent convergence in verification performance*
 
 **ReLU Performance Highlights**:
-- 🎯 **Target Reached**: 99% accuracy achieved at epoch 100
+- 🎯 **Target Exceeded**: 0.99 accuracy target exceeded at epoch 100
 - ⚡ **Training Speed**: 2.9 seconds total training time
-- 📈 **Convergence**: Smooth progression to 100% accuracy
-- 🛡️ **Adversary Defeated**: 0% success rate for fake proofs
+- 📈 **Convergence**: Smooth progression to 1.0000 accuracy
+- 🛡️ **Adversary Performance**: Low success rate for fake proofs
 
-### The Flatten Challenge: 100% in 108 Epochs
+### The Flatten Training Example: 1.0000 Accuracy in 108 Epochs
 
-The Flatten operation demonstrated the power of **persistent training** - initially struggling but achieving perfect accuracy:
+The Flatten operation demonstrated **persistent training** - initially variable but achieving high accuracy:
 
 ![Flatten Training Metrics](ops/flatten_1x16x4x4/plots/flatten_1x16x4x4_training_metrics.png)
-*Flatten operation showing initial volatility before stabilizing at 100% accuracy*
+*Flatten operation showing initial volatility before stabilizing at 1.0000 accuracy*
 
 ![Flatten Training Summary](ops/flatten_1x16x4x4/plots/flatten_1x16x4x4_training_summary.png)
-*Training summary showing the journey from 68.8% to perfect 100% verification*
+*Training summary showing the progression from 0.688 to 1.0000 verification accuracy*
 
 **Flatten Performance Highlights**:
-- 🎯 **Target Exceeded**: 99% accuracy achieved at epoch 108
+- 🎯 **Target Exceeded**: 0.99 accuracy target exceeded at epoch 108
 - 🔄 **Adaptive Training**: Continued beyond minimum 100 epochs
-- 📈 **Persistence Pays**: Overcame early training volatility
-- ⚡ **Fast Completion**: 2.5 seconds including extended training
+- 📈 **Training Progress**: Overcame early training volatility
+- ⚡ **Efficient Training**: 2.5 seconds including extended training
 
 ### Conv2d: The Complex Challenge
 
@@ -207,33 +207,33 @@ Convolutional operations present the greatest challenge due to their complexity:
 *Training analysis revealing the trade-offs in complex operation verification*
 
 **Conv2d Performance Analysis**:
-- 🥈 **Final Accuracy**: 84.4% (highest achieved for this operation)
+- 📊 **Measured Accuracy**: 0.844 (highest achieved for this operation)
 - ⏱️ **Training Duration**: 4.1 seconds (longest training time)
 - 🔄 **Early Stopping**: Triggered after 50 epochs without improvement
-- 🧠 **Complexity Factor**: Spatial convolutions are inherently harder to verify
+- 🧠 **Complexity Factor**: Spatial convolutions present verification challenges
 
-## 🧬 Neural Architecture Search Breakthrough
+## 🧬 Neural Architecture Search Implementation
 
-### The Evolution to Perfection
+### Evolutionary Architecture Optimization
 
-Nomopoly introduces the **first Neural Architecture Search system for ZKML**, automatically evolving neural networks to achieve ultra-precision verification. The NAS system employs evolutionary algorithms to discover optimal architectures that surpass human-designed networks.
+Nomopoly implements a **Neural Architecture Search system for ZKML**, using evolutionary algorithms to automatically optimize neural network architectures for verification tasks. The NAS system explores architecture space to discover configurations that achieve high verification accuracy.
 
 #### 🔬 NAS Key Discoveries
 
-Through evolutionary search across 20 generations with populations of 10 architectures each, the system discovered optimal patterns for ultra-precision verification:
+Through evolutionary search across multiple generations with populations of architectures, the system discovered effective patterns for high-accuracy verification:
 
-**Architecture Patterns for 100% Accuracy:**
-- **Large Networks**: 2048→1024 hidden layers achieve superior precision
-- **Advanced Activations**: Swish/Tanh outperform ReLU for perfect accuracy  
-- **Layer Normalization**: Critical for training stability at ultra-precision
-- **Ultra-Low Learning Rates**: 5e-6 with AdamW optimizer optimal
-- **Ensemble Methods**: 5-model ensembles provide redundancy for perfection
-- **Data Augmentation**: Mixup improves generalization capabilities
-- **Label Smoothing**: Prevents overfitting at extreme precision levels
+**Successful Architecture Patterns:**
+- **Large Networks**: 2048→1024 hidden layers demonstrate strong performance
+- **Advanced Activations**: Swish/Tanh show advantages over ReLU in our evaluation
+- **Layer Normalization**: Important for training stability at high accuracy levels
+- **Low Learning Rates**: 5e-6 with AdamW optimizer shows effectiveness
+- **Ensemble Methods**: 5-model ensembles provide improved reliability
+- **Data Augmentation**: Mixup augmentation improves generalization
+- **Label Smoothing**: Helps prevent overfitting at high accuracy targets
 
 #### 📐 Evolved Architecture Examples
 
-**Conv2d Perfect Architecture (100% accuracy):**
+**Conv2d High-Performance Architecture (1.00000 accuracy achieved):**
 ```python
 NASConfig(
     hidden_layers=[2048, 1024],
@@ -248,7 +248,7 @@ NASConfig(
 )
 ```
 
-**GEMM Perfect Architecture (100% accuracy):**
+**GEMM High-Performance Architecture (1.00000 accuracy achieved):**
 ```python
 NASConfig(
     hidden_layers=[2048, 1024],
@@ -268,10 +268,10 @@ NASConfig(
 
 | Approach | Compilation Time | Accuracy | Method |
 |----------|------------------|----------|--------|
-| **Nomopoly NAS** | **173.3s** | **100.000%** | Evolutionary ML |
-| EZKL | Hours | 100% certainty | Cryptographic |
-| zkTorch | Hours | Mathematical | Circuit-based |
-| Manual Design | Minutes | ~85% typical | Human engineering |
+| **Nomopoly NAS** | **173.3s** | **1.00000** | Evolutionary ML |
+| EZKL | Hours | Mathematical certainty | Cryptographic |
+| zkTorch | Hours | Mathematical certainty | Circuit-based |
+| Manual Design | Minutes | ~0.85 typical | Human engineering |
 
 ### 🎯 Ultra-Precision Training Process
 
@@ -286,7 +286,7 @@ results = framework.compile_uncompiled_operations(
     population_size=10        # Parallel architectures
 )
 
-# Results: 100% accuracy achieved for all operations!
+# Results: 1.00000 accuracy achieved for all evaluated operations!
 ```
 
 The NAS system automatically:
@@ -300,13 +300,13 @@ The NAS system automatically:
 
 Currently supported ONNX operations with **automatic NAS-enhanced compilation**:
 
-| Operation | NAS Success Rate | Evolution Complexity | Production Status |
-|-----------|------------------|---------------------|------------------|
-| **ReLU** | **100.0%** ✨ | Low (Gen 1) | ✅ Production Ready |
-| **Flatten** | **100.0%** ✨ | Medium (Gen 2) | ✅ Production Ready |
-| **Gemm/MatMul** | **100.0%** ✨ | Medium (Gen 2) | ✅ Production Ready |
-| **MaxPool** | **100.0%** ✨ | Low (Gen 1) | ✅ Production Ready |
-| **Conv2d** | **100.0%** ✨ | High (Gen 1) | ✅ Production Ready |
+| Operation | Evaluation Accuracy | Evolution Complexity | Implementation Status |
+|-----------|---------------------|---------------------|----------------------|
+| **ReLU** | **1.00000** | Low (Gen 1) | ✅ Implemented |
+| **Flatten** | **1.00000** | Medium (Gen 2) | ✅ Implemented |
+| **Gemm/MatMul** | **1.00000** | Medium (Gen 2) | ✅ Implemented |
+| **MaxPool** | **1.00000** | Low (Gen 1) | ✅ Implemented |
+| **Conv2d** | **1.00000** | High (Gen 1) | ✅ Implemented |
 | **AvgPool** | Fixed dimensions | Medium | 🔧 Implemented |
 | **Reshape** | Fixed dimensions | Low | 🔧 Implemented |
 | **Add** | Fixed dimensions | Low | 🔧 Implemented |
@@ -320,16 +320,16 @@ Each compiled operation creates a **self-contained ecosystem**:
 
 ```
 ops/
-├── relu_1x16x8x8/                    # 🏆 100% accuracy ReLU
+├── relu_1x16x8x8/                    # High-accuracy ReLU implementation
 │   ├── relu_1x16x8x8_prover.onnx     # Original operation + proof generation
-│   ├── relu_1x16x8x8_verifier.onnx   # 100% accuracy authenticity verification
+│   ├── relu_1x16x8x8_verifier.onnx   # High-accuracy authenticity verification
 │   ├── relu_1x16x8x8_adversary.onnx  # Fake proof generator (training aid)
-│   ├── compilation_metrics.json       # 100 epochs of training data
+│   ├── compilation_metrics.json       # Training data and metrics
 │   ├── compilation.log                # Detailed training logs
 │   └── plots/
 │       ├── relu_1x16x8x8_training_metrics.png     # Real-time training view
 │       └── relu_1x16x8x8_training_summary.png     # Statistical analysis
-├── flatten_1x16x4x4/                 # Another 100% accuracy operation
+├── flatten_1x16x4x4/                 # Another high-accuracy operation
 │   └── ...                           # Same comprehensive structure
 └── ...
 ```
@@ -374,34 +374,34 @@ if epochs_without_improvement >= patience and epoch >= min_epochs:
 - **Score Separation**: Gap between real proof scores (→1.0) and fake proof scores (→0.0)
 - **Training Dynamics**: Evolution of adversarial competition over epochs
 
-## 🏆 ZKML Performance Revolution
+## 📊 ZKML Performance Comparison
 
 ### Nomopoly vs. The Competition
 
 | Metric | **Nomopoly** | **EZKL** | **zkTorch** | **Circom/snarkjs** |
 |--------|-------------|-----------|-------------|-------------------|
-| **Compilation Speed** | **16.8s** ⚡ | 2-48 hours | 1-24 hours | Days to weeks |
-| **Verification Accuracy** | **96.4%** 🎯 | 100% (math) | 100% (math) | 100% (math) |
-| **Setup Complexity** | **One command** 🚀 | Manual circuits | Semi-manual | Full manual |
-| **Proof Size** | **16-32D vectors** 📦 | 10-100KB | 1-10MB | 1-5KB |
-| **Scalability** | **Linear** 📈 | Exponential | Quadratic | Manual design |
-| **Development Time** | **Minutes** ⏰ | Days | Days | Weeks |
+| **Compilation Speed** | **~173s** | 2-48 hours | 1-24 hours | Days to weeks |
+| **Verification Approach** | **ML-based (~1.0)** | Mathematical certainty | Mathematical certainty | Mathematical certainty |
+| **Setup Complexity** | **One command** | Manual circuits | Semi-manual | Full manual |
+| **Proof Size** | **Neural network outputs** | 10-100KB | 1-10MB | 1-5KB |
+| **Scalability** | **Linear with model size** | Exponential | Quadratic | Manual design |
+| **Development Time** | **Minutes** | Days | Days | Weeks |
 
-### The Speed-Security Trade-off Solved
+### Trade-offs in ZKML Approaches
 
-**Traditional Approach**: 100% mathematical certainty, hours of compilation
-**Nomopoly Approach**: 96.4% computational verification, seconds of compilation
+**Traditional Approach**: Mathematical certainty, hours of compilation
+**Nomopoly Approach**: High computational verification accuracy, minutes of compilation
 
-**When to Choose Nomopoly**:
+**When to Consider Nomopoly**:
 - ✅ Rapid prototyping and development
-- ✅ Applications where 96%+ accuracy is sufficient
-- ✅ Large-scale model deployment
+- ✅ Applications where high accuracy verification is appropriate
+- ✅ Research and development use cases
 - ✅ Cost-sensitive environments
 
 **When to Choose Traditional ZK**:
-- ✅ Maximum security requirements
+- ✅ Production systems requiring mathematical guarantees
 - ✅ Regulatory compliance needs
-- ✅ Small model, infrequent compilation
+- ✅ High-stakes security applications
 
 ### Resource Usage Reality Check
 
@@ -411,7 +411,7 @@ if epochs_without_improvement >= patience and epoch >= min_epochs:
 | **EZKL** | +10-50x | +500% | +10,000% | 100x |
 | **zkTorch** | +20-100x | +1,000% | +5,000% | 50x |
 
-**🌱 Environmental Impact**: Nomopoly uses **98% less energy** than traditional ZKML approaches
+**🌱 Environmental Impact**: Nomopoly requires significantly less computational resources than traditional ZKML approaches for compilation
 
 ## 🔧 Advanced Configuration & Tuning
 
@@ -455,7 +455,7 @@ print(f"⏱️ Training Time: {op_info.compilation_time:.1f}s")
 # Find best performing operations  
 compiled_ops = ops_registry.get_compiled_operations()
 best_ops = [op for op in compiled_ops if op.final_accuracy >= 0.99]
-print(f"🏆 Perfect operations: {len(best_ops)}")
+print(f"🎯 High-accuracy operations: {len(best_ops)}")
 ```
 
 ## 🎯 Real-World Applications
@@ -465,7 +465,7 @@ print(f"🏆 Perfect operations: {len(best_ops)}")
 **🏥 Healthcare AI**: Medical image analysis with privacy guarantees
 - Challenge: Patient data privacy in AI diagnostics
 - Solution: Verify AI decisions without exposing medical data
-- Nomopoly Fit: 96% accuracy sufficient for preliminary screening
+- Nomopoly Fit: High accuracy appropriate for research applications
 
 **🏦 Financial Services**: Fraud detection with auditability
 - Challenge: Prove AI fraud detection without revealing transaction details
@@ -475,7 +475,7 @@ print(f"🏆 Perfect operations: {len(best_ops)}")
 **🛡️ Identity Verification**: Biometric authentication with privacy
 - Challenge: Verify identity without storing biometric data
 - Solution: Proof of correct face/fingerprint matching
-- Nomopoly Fit: High accuracy needed, 99%+ verification critical
+- Nomopoly Fit: High accuracy demonstrated in evaluation
 
 ## 🗂️ Project Structure
 
@@ -488,12 +488,12 @@ nomopoly/
 │   ├── ops_registry.py               # 📋 Operation discovery & tracking
 │   └── utils.py                      # 🔧 ONNX utilities
 ├── ops/                              # 📦 Compiled operations (auto-generated)
-│   ├── relu_1x16x8x8/               # 🏆 100% accuracy ReLU
-│   ├── flatten_1x16x4x4/            # 🏆 100% accuracy Flatten
-│   ├── gemm_1x256/                  # 🏆 100% accuracy Matrix Multiply
-│   ├── maxpool_1x16x8x8/            # 🥇 93.8% accuracy Max Pooling
-│   ├── conv_1x3x8x8/                # 🥈 84.4% accuracy Convolution
-│   └── relu_1x256/                  # 🏆 100% accuracy ReLU (different size)
+│   ├── relu_1x16x8x8/               # High-accuracy ReLU implementation
+│   ├── flatten_1x16x4x4/            # High-accuracy Flatten implementation
+│   ├── gemm_1x256/                  # High-accuracy Matrix Multiply
+│   ├── maxpool_1x16x8x8/            # Max Pooling (0.938 accuracy)
+│   ├── conv_1x3x8x8/                # Convolution (0.844 accuracy)
+│   └── relu_1x256/                  # High-accuracy ReLU (different size)
 ├── demo_onnx_compilation.py          # 🚀 Complete demonstration
 ├── create_test_onnx_model.py         # 🧪 Test model generator
 ├── requirements.txt                  # 📋 Dependencies
@@ -515,13 +515,13 @@ nomopoly/
 - [ ] **Cross-Framework Support**: TensorFlow, JAX, PyTorch native support
 - [ ] **Blockchain Integration**: On-chain verification with optimistic rollups
 
-### The 100% Accuracy Challenge
+### Ongoing Accuracy Research
 
-**Current Status**: 96.4% average, 66.7% perfect operations
-**Goal**: 99%+ average accuracy across all operation types
+**Current Status**: High accuracy achieved on evaluated operations
+**Research Goal**: Improve accuracy and consistency across all operation types
 **Strategy**: Enhanced adversarial architectures, curriculum learning, meta-learning approaches
 
-## 🤝 Join the ZKML Revolution
+## 🤝 Contributing to ZKML Research
 
 ### Contributing to the Future
 
@@ -553,6 +553,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ---
 
-> **"In the race between security and speed, Nomopoly chooses both."**
+> **"Exploring the balance between security and speed in ZKML."**
 > 
-> *96.4% verification accuracy in 16.8 seconds proves that practical ZKML is here.*
+> *High verification accuracy in seconds demonstrates the potential for practical ZKML approaches.*
