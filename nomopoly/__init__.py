@@ -13,10 +13,22 @@ from .networks import (
     ZKVerifierNet, 
     ZKAdversarialNet,
     create_holographic_model,
-    SimpleONNXComputation
+    SimpleONNXComputation,
+    # Per-layer verifiable training
+    VerifiableLayer,
+    VerifiableLinear,
+    VerifiableReLU,
+    VerifiableConv2d
 )
 
 from .training import ZKTrainer
+
+from .layer_training import (
+    LayerTrainer,
+    MultiLayerTrainer,
+    SimpleVerifiableNet,
+    create_demo_verifiable_network
+)
 
 from .plotting import ZKPlotter, create_training_plots
 
@@ -29,6 +41,25 @@ from .utils import (
     convert_pytorch_to_onnx,
     validate_onnx_model,
     OnnxHandler
+)
+
+from .ops_registry import (
+    SupportedOp,
+    OpCompilationInfo,
+    OpsRegistry,
+    ops_registry
+)
+
+from .onnx_compiler import (
+    ONNXOperationWrapper,
+    ONNXVerifier,
+    ONNXAdversary,
+    ONNXOperationCompiler
+)
+
+from .compilation_framework import (
+    ONNXCompilationFramework,
+    compilation_framework
 )
 
 __version__ = "0.3.0"
@@ -48,8 +79,20 @@ __all__ = [
     "ZKAdversarialNet",
     "SimpleONNXComputation",
     
+    # Per-layer verifiable training
+    "VerifiableLayer",
+    "VerifiableLinear",
+    "VerifiableReLU",
+    "VerifiableConv2d",
+    
     # Training system
     "ZKTrainer",
+    
+    # Per-layer training system
+    "LayerTrainer",
+    "MultiLayerTrainer", 
+    "SimpleVerifiableNet",
+    "create_demo_verifiable_network",
     
     # Plotting and visualization
     "ZKPlotter",
@@ -67,6 +110,22 @@ __all__ = [
     "convert_pytorch_to_onnx", 
     "validate_onnx_model",
     "OnnxHandler",
+    
+    # ONNX Operations Registry
+    "SupportedOp",
+    "OpCompilationInfo", 
+    "OpsRegistry",
+    "ops_registry",
+    
+    # ONNX Operation Compiler
+    "ONNXOperationWrapper",
+    "ONNXVerifier",
+    "ONNXAdversary", 
+    "ONNXOperationCompiler",
+    
+    # Compilation Framework
+    "ONNXCompilationFramework",
+    "compilation_framework",
     
     # Version info
     "__version__",

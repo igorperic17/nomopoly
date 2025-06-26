@@ -205,124 +205,125 @@ class HolographicWrapper(nn.Module):
             output = self.base_model(x)
             holographic_memory.bind_activation(output, 0, device)
             
-        return output
+        return output, holographic_memory
     
     def forward(self, x):
-        """Forward pass with integrated holographic memory."""
-        # Create fresh holographic memory for this forward pass
-        holographic_memory = HolographicMemory(self.memory_size)
+        """
+        Forward pass with integrated holographic memory.
+        Returns (output, proof) where proof is FIXED-SIZE regardless of network size.
+        """
+        device = x.device
+        holographic_memory = HolographicMemory(memory_size=self.memory_size).to(device)
+        holographic_memory.reset_memory()
         
-        # Run model with holographic memory integration
-        result = self._bind_intermediate_activations(x, holographic_memory)
+        # Perform forward pass with memory binding
+        output, bound_memory = self._bind_intermediate_activations(x, holographic_memory)
         
-        # Generate proof from holographic memory
-        memory_trace = holographic_memory.get_memory_trace()
-        
-        # Ensure memory trace matches batch size
-        if memory_trace.shape[0] != x.shape[0]:
-            memory_trace = memory_trace.expand(x.shape[0], -1)
-            
+        # Generate fixed-size proof from holographic memory
+        memory_trace = bound_memory.get_memory_trace()
         proof = self.proof_generator(memory_trace)
         
-        return result, proof
+        return output, proof
     
     def export_original_vs_augmented(self, save_dir: str = "exported_models"):
-        """Export both original and augmented networks to compare architectures."""
+        """Export both original and augmented models to ONNX for comparison."""
         import os
-        os.makedirs(save_dir, exist_ok=True)
+        from .utils import convert_pytorch_to_onnx, validate_onnx_model
         
-        # Store original device
-        original_device = next(self.parameters()).device
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
         
-        # Export original network
-        self.base_model.cpu()
-        dummy_input = torch.randn(1, 196)  # MNIST input size
+        # Export original model  
+        print("Exporting original model...")
+        dummy_input = torch.randn(1, 196)  # MNIST 14x14 flattened
         
-        torch.onnx.export(
-            self.base_model,
-            dummy_input,
-            f"{save_dir}/original_mnist_net.onnx",
-            export_params=True,
-            opset_version=10,
+        # Extract the base model for export
+        original_path = os.path.join(save_dir, "original_mnist.onnx")
+        convert_pytorch_to_onnx(
+            model=self.base_model, 
+            dummy_input=dummy_input,
+            output_path=original_path,
             input_names=['input'],
-            output_names=['output'],
-            dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
+            output_names=['output']
         )
         
-        # Export holographic wrapper
-        self.cpu()
-        torch.onnx.export(
-            self,
-            dummy_input,
-            f"{save_dir}/holographic_wrapper.onnx",
-            export_params=True,
-            opset_version=10,
+        # Validate original
+        if validate_onnx_model(original_path):
+            print(f"✅ Original model exported and validated: {original_path}")
+        else:
+            print(f"❌ Original model validation failed: {original_path}")
+        
+        # Export augmented model (with proofs)
+        print("Exporting augmented model with proofs...")
+        augmented_path = os.path.join(save_dir, "augmented_mnist_with_proofs.onnx")
+        convert_pytorch_to_onnx(
+            model=self,
+            dummy_input=dummy_input,
+            output_path=augmented_path,
             input_names=['input'],
-            output_names=['output', 'proof'],
-            dynamic_axes={
-                'input': {0: 'batch_size'}, 
-                'output': {0: 'batch_size'},
-                'proof': {0: 'batch_size'}
-            }
+            output_names=['output', 'proof']
         )
         
-        # Move back to original device
-        self.to(original_device)
-        self.base_model.to(original_device)
+        # Validate augmented
+        if validate_onnx_model(augmented_path):
+            print(f"✅ Augmented model exported and validated: {augmented_path}")
+        else:
+            print(f"❌ Augmented model validation failed: {augmented_path}")
         
-        print(f"✅ Exported networks to {save_dir}/:")
-        print(f"   - original_mnist_net.onnx (original network)")
-        print(f"   - holographic_wrapper.onnx (HRR-augmented network)")
+        return {
+            "original": original_path,
+            "augmented": augmented_path
+        }
 
 
 class ZKProverNet(nn.Module):
     """
-    ZK Prover Network: Uses HolographicWrapper for fixed-size proof generation.
-    This is our main "inference network" that generates authentic proofs.
+    Zero Knowledge Prover Network - generates authentic proofs for computation verification.
+    This is the FROZEN inference network that never gets trained.
     """
     
     def __init__(self, input_dim: int, output_dim: int, proof_dim: int = 64):
-        super().__init__()
+        super(ZKProverNet, self).__init__()
         
+        # Store dimensions for reference
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.proof_dim = proof_dim
         
-        # Create original network
-        original_net = OriginalMNISTNet(input_dim, output_dim)
-        
-        # Wrap with holographic memory
-        self.holographic_model = HolographicWrapper(original_net, proof_dim, memory_size=512)
+        # Create the HRR-augmented network
+        original_model = OriginalMNISTNet(input_dim, output_dim)
+        self.holographic_model = HolographicWrapper(original_model, proof_dim)
         
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Generate both classification and proof using HRR."""
+        """Generate authentic computation result and proof."""
         return self.holographic_model(x)
     
     def get_original_output(self, x: torch.Tensor) -> torch.Tensor:
-        """Get only the original computation result."""
+        """Get output from the original model without proof generation."""
         return self.holographic_model.base_model(x)
     
     def export_networks(self, save_dir: str = "exported_models"):
-        """Export original vs holographic networks."""
-        self.holographic_model.export_original_vs_augmented(save_dir)
+        """Export prover networks to ONNX."""
+        return self.holographic_model.export_original_vs_augmented(save_dir)
 
 
 class ZKVerifierNet(nn.Module):
     """
-    ZK Verifier Network: Validates (input, output, proof) triplets.
-    Verifies that the proof is authentic for the given input-output pair.
+    Zero Knowledge Verifier Network - binary classifier for (input, output, proof) triplets.
+    Learns to distinguish authentic proofs from fake ones.
     """
     
     def __init__(self, input_dim: int, output_dim: int, proof_dim: int = 64):
-        super().__init__()
+        super(ZKVerifierNet, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.proof_dim = proof_dim
-        self.layers = None
+        self.layers = None  # Will be built dynamically
         
     def _build_layers(self, input_dim, output_dim, proof_dim, device):
         """Build verifier layers dynamically on first forward pass."""
         total_input_dim = input_dim + output_dim + proof_dim
+        
         self.layers = nn.Sequential(
             nn.Linear(total_input_dim, 512),
             nn.ReLU(),
@@ -333,164 +334,434 @@ class ZKVerifierNet(nn.Module):
             nn.Linear(256, 128),
             nn.ReLU(),
             nn.Dropout(0.2),
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1),
-            nn.Sigmoid()
+            nn.Linear(128, 1),
+            nn.Sigmoid()  # Binary classification: real (1) vs fake (0)
         ).to(device)
         
     def forward(self, input_data: torch.Tensor, output_data: torch.Tensor, proof: torch.Tensor) -> torch.Tensor:
         """
-        Verify if the (input, output, proof) triplet is valid.
+        Verify if the (input, output, proof) triplet is authentic.
         
         Args:
             input_data: Original input to the computation
-            output_data: Claimed output of the computation
+            output_data: Claimed output from the computation  
             proof: Proof that the computation was performed correctly
             
         Returns:
-            Verification score (0-1): 1 = valid triplet, 0 = invalid triplet
+            Binary classification score: 1 = authentic, 0 = fake
         """
+        device = input_data.device
+        
+        # Build layers on first forward pass
         if self.layers is None:
-            # Build layers dynamically
-            self._build_layers(input_data.shape[-1], output_data.shape[-1], proof.shape[-1], input_data.device)
+            self._build_layers(self.input_dim, self.output_dim, self.proof_dim, device)
         
-        # Concatenate input, output, and proof
-        combined = torch.cat([input_data, output_data, proof], dim=-1)
+        # Flatten all inputs if needed
+        input_flat = input_data.view(input_data.shape[0], -1)
+        output_flat = output_data.view(output_data.shape[0], -1) 
+        proof_flat = proof.view(proof.shape[0], -1)
         
-        # Return verification score
-        return self.layers(combined)
+        # Concatenate triplet
+        triplet = torch.cat([input_flat, output_flat, proof_flat], dim=1)
+        
+        # Binary classification
+        verification_score = self.layers(triplet)
+        
+        return verification_score
 
 
 class ZKAdversarialNet(nn.Module):
     """
-    ZK Adversarial Network: Generates fake outputs and fake proofs.
-    Creates different types of adversarial samples to test verifier robustness.
+    Zero Knowledge Adversarial Network - generates fake proofs to fool the verifier.
+    
+    This is the "generator" in our GAN-like setup that tries to produce convincing 
+    fake proofs given just the input.
     """
     
     def __init__(self, input_dim: int, output_dim: int, proof_dim: int = 64):
-        super().__init__()
-        
+        super(ZKAdversarialNet, self).__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.proof_dim = proof_dim
         
-        # Network for generating slightly different outputs (corrupted but plausible)
-        self.corrupted_classifier = nn.Sequential(
-            nn.Linear(input_dim, 128),
+        # Build the fake output generator
+        self.output_generator = nn.Sequential(
+            nn.Linear(input_dim, 256),
             nn.ReLU(),
-            nn.Dropout(0.4),  # Higher dropout for more variation
-            nn.Linear(128, 64),
+            nn.Dropout(0.2),
+            nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Dropout(0.4),
-            nn.Linear(64, output_dim),
-            nn.LogSoftmax(dim=-1)
+            nn.Dropout(0.2),
+            nn.Linear(128, output_dim),
+            nn.LogSoftmax(dim=-1)  # Match original network output format
         )
         
-        # Network for generating completely random outputs
-        self.random_output_generator = nn.Sequential(
-            nn.Linear(input_dim, 64),
+        # Build the fake proof generator  
+        self.proof_generator = nn.Sequential(
+            nn.Linear(input_dim, 512),
             nn.ReLU(),
-            nn.Linear(64, output_dim),
-            nn.LogSoftmax(dim=-1)
-        )
-        
-        # Fake proof generator that tries to create convincing proofs for wrong outputs
-        self.fake_proof_generator = nn.Sequential(
-            nn.Linear(input_dim + output_dim, 256),  # Takes input + fake output
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Dropout(0.3),
+            nn.Dropout(0.2),
             nn.Linear(128, proof_dim),
-            nn.Tanh()  # Bounded output
+            nn.Tanh()  # Normalize fake proof values
         )
         
-        # Noise layer for proof variation
-        self.proof_noise_layer = nn.Sequential(
-            nn.Linear(proof_dim, proof_dim),
+        # Combined generator (sometimes generates both together for consistency)
+        combined_output_dim = output_dim + proof_dim
+        self.combined_generator = nn.Sequential(
+            nn.Linear(input_dim, 512),
             nn.ReLU(),
-            nn.Linear(proof_dim, proof_dim)
+            nn.Dropout(0.3),
+            nn.Linear(512, 384),
+            nn.ReLU(),
+            nn.Dropout(0.3), 
+            nn.Linear(384, 256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, combined_output_dim)
         )
         
     def forward(self, x: torch.Tensor, mode: str = "mixed") -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Generate fake outputs and fake proofs.
+        Generate fake output and fake proof to fool the verifier.
         
         Args:
             x: Input tensor
-            mode: Type of fake output to generate
-                - "corrupted": Slightly different from correct output
-                - "random": Completely random output
-                - "mixed": Randomly choose between corrupted and random
+            mode: Generation mode
+                - "separate": Use separate generators for output and proof
+                - "combined": Use combined generator for consistency
+                - "mixed": Randomly choose between separate and combined
+                - "corrupted": Generate corrupted version of real output
                 
         Returns:
             Tuple of (fake_output, fake_proof)
         """
-        batch_size = x.shape[0]
-        
-        if mode == "mixed":
-            # Randomly choose between corrupted and random for each sample
-            use_corrupted = torch.rand(batch_size, 1, device=x.device) > 0.5
+        if mode == "separate":
+            fake_output = self.output_generator(x)
+            fake_proof = self.proof_generator(x)
             
-            corrupted_output = self.corrupted_classifier(x)
-            random_output = self.random_output_generator(x)
+        elif mode == "combined":
+            combined = self.combined_generator(x)
+            fake_output = combined[:, :self.output_dim]
+            fake_proof = combined[:, self.output_dim:]
             
-            # Mix outputs based on random choice
-            fake_output = torch.where(use_corrupted, corrupted_output, random_output)
+            # Apply appropriate activations
+            fake_output = F.log_softmax(fake_output, dim=-1)
+            fake_proof = torch.tanh(fake_proof)
+            
+        elif mode == "mixed":
+            # Randomly choose generation strategy
+            if torch.rand(1).item() < 0.5:
+                fake_output = self.output_generator(x)
+                fake_proof = self.proof_generator(x)
+            else:
+                combined = self.combined_generator(x)
+                fake_output = combined[:, :self.output_dim]
+                fake_proof = combined[:, self.output_dim:]
+                fake_output = F.log_softmax(fake_output, dim=-1)
+                fake_proof = torch.tanh(fake_proof)
             
         elif mode == "corrupted":
-            fake_output = self.corrupted_classifier(x)
-            
-        elif mode == "random":
-            fake_output = self.random_output_generator(x)
+            # Generate slightly corrupted outputs (harder to detect)
+            fake_output = self.generate_corrupted_output(x)
+            fake_proof = self.proof_generator(x)
             
         else:
             raise ValueError(f"Unknown mode: {mode}")
         
-        # Generate fake proof for the fake output
-        proof_input = torch.cat([x, fake_output], dim=-1)
-        base_fake_proof = self.fake_proof_generator(proof_input)
-        
-        # Add noise to make proof more convincing
-        fake_proof = base_fake_proof + self.proof_noise_layer(base_fake_proof) * 0.1
-        
         return fake_output, fake_proof
     
     def generate_corrupted_output(self, x: torch.Tensor) -> torch.Tensor:
-        """Generate slightly corrupted but plausible output."""
-        return self.corrupted_classifier(x)
+        """Generate subtly corrupted output that's harder to detect."""
+        base_output = self.output_generator(x)
+        noise = torch.randn_like(base_output) * 0.1  # Small corruption
+        return base_output + noise
     
     def generate_random_output(self, x: torch.Tensor) -> torch.Tensor:
-        """Generate completely random output."""
-        return self.random_output_generator(x)
+        """Generate completely random output (easy to detect)."""
+        batch_size = x.shape[0]
+        return torch.randn(batch_size, self.output_dim, device=x.device)
 
 
-# Factory function for easy creation
 def create_holographic_model(base_model, proof_size=64, memory_size=512):
     """
-    Create a holographic memory-enabled model.
+    Factory function to create HRR-augmented models.
     
     Args:
-        base_model: The original PyTorch model
-        proof_size: Size of the generated proof (fixed!)
+        base_model: Original PyTorch model to augment
+        proof_size: Size of the generated proof vector
         memory_size: Size of the holographic memory
         
     Returns:
-        HolographicWrapper model that generates fixed-size proofs
+        HolographicWrapper instance
     """
     return HolographicWrapper(base_model, proof_size, memory_size)
 
 
-# Keep compatibility classes
 class SimpleONNXComputation(nn.Module):
-    """Simple wrapper for ONNX model computation (for compatibility)."""
+    """Simple computation that can be easily exported to ONNX for testing."""
     
     def __init__(self, onnx_model_path: Optional[str] = None):
-        super().__init__()
-        self.onnx_model_path = onnx_model_path
+        super(SimpleONNXComputation, self).__init__()
+        self.linear = nn.Linear(10, 1)
         
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # Placeholder computation
-        return F.log_softmax(x @ torch.randn(x.shape[-1], 10), dim=-1) 
+        return self.linear(x)
+
+
+# ===== PER-LAYER VERIFIABLE TRAINING SYSTEM =====
+
+class VerifiableLayer(nn.Module):
+    """
+    Base class for verifiable layers that can be trained with adversarial proof generation.
+    
+    Each verifiable layer:
+    1. Performs a specific computation (linear, relu, conv2d, etc.)
+    2. Has a verifier that takes (input, output, proof) and outputs binary classification
+    3. Has a generator that takes input and produces fake output + proof
+    """
+    
+    def __init__(self, proof_dim: int = 32):
+        super(VerifiableLayer, self).__init__()
+        self.proof_dim = proof_dim
+        self.verifier = None  # Will be built dynamically
+        self.generator = None  # Will be built dynamically
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform the layer computation."""
+        raise NotImplementedError("Subclasses must implement forward")
+        
+    def generate_proof(self, x: torch.Tensor, output: torch.Tensor) -> torch.Tensor:
+        """Generate a proof for the computation (input, output)."""
+        raise NotImplementedError("Subclasses must implement generate_proof")
+        
+    def verify_triplet(self, x: torch.Tensor, output: torch.Tensor, proof: torch.Tensor) -> torch.Tensor:
+        """Verify if (input, output, proof) triplet is authentic."""
+        raise NotImplementedError("Subclasses must implement verify_triplet")
+        
+    def generate_fake(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Generate fake output and proof given input."""
+        raise NotImplementedError("Subclasses must implement generate_fake")
+
+
+class VerifiableLinear(VerifiableLayer):
+    """Verifiable linear layer with adversarial training."""
+    
+    def __init__(self, in_features: int, out_features: int, proof_dim: int = 32):
+        super(VerifiableLinear, self).__init__(proof_dim)
+        self.in_features = in_features
+        self.out_features = out_features
+        
+        # The actual linear computation
+        self.linear = nn.Linear(in_features, out_features)
+        
+        # Verifier: takes (input, output, proof) -> binary classification
+        self.verifier = nn.Sequential(
+            nn.Linear(in_features + out_features + proof_dim, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+        
+        # Generator: takes input -> fake output + proof
+        self.generator = nn.Sequential(
+            nn.Linear(in_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(128, out_features + proof_dim),
+        )
+        
+        # Proof generator: takes (input, output) -> proof
+        self.proof_gen = nn.Sequential(
+            nn.Linear(in_features + out_features, 64),
+            nn.ReLU(),
+            nn.Linear(64, proof_dim),
+            nn.Tanh()
+        )
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform linear computation."""
+        return self.linear(x)
+        
+    def generate_proof(self, x: torch.Tensor, output: torch.Tensor) -> torch.Tensor:
+        """Generate authentic proof for the linear computation."""
+        combined = torch.cat([x, output], dim=-1)
+        return self.proof_gen(combined)
+        
+    def verify_triplet(self, x: torch.Tensor, output: torch.Tensor, proof: torch.Tensor) -> torch.Tensor:
+        """Verify (input, output, proof) triplet."""
+        triplet = torch.cat([x, output, proof], dim=-1)
+        return self.verifier(triplet)
+        
+    def generate_fake(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Generate fake output and proof."""
+        fake_combined = self.generator(x)
+        fake_output = fake_combined[..., :self.out_features]
+        fake_proof = torch.tanh(fake_combined[..., self.out_features:])
+        return fake_output, fake_proof
+
+
+class VerifiableReLU(VerifiableLayer):
+    """Verifiable ReLU layer with adversarial training."""
+    
+    def __init__(self, num_features: int, proof_dim: int = 32):
+        super(VerifiableReLU, self).__init__(proof_dim)
+        self.num_features = num_features
+        
+        # Verifier: takes (input, output, proof) -> binary classification
+        self.verifier = nn.Sequential(
+            nn.Linear(num_features * 2 + proof_dim, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(128, 64),
+            nn.ReLU(),
+            nn.Linear(64, 1),
+            nn.Sigmoid()
+        )
+        
+        # Generator: takes input -> fake output + proof
+        self.generator = nn.Sequential(
+            nn.Linear(num_features, 128),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(128, num_features + proof_dim),
+        )
+        
+        # Proof generator: takes (input, output) -> proof
+        self.proof_gen = nn.Sequential(
+            nn.Linear(num_features * 2, 64),
+            nn.ReLU(),
+            nn.Linear(64, proof_dim),
+            nn.Tanh()
+        )
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform ReLU computation."""
+        return F.relu(x)
+        
+    def generate_proof(self, x: torch.Tensor, output: torch.Tensor) -> torch.Tensor:
+        """Generate authentic proof for ReLU computation."""
+        combined = torch.cat([x, output], dim=-1)
+        return self.proof_gen(combined)
+        
+    def verify_triplet(self, x: torch.Tensor, output: torch.Tensor, proof: torch.Tensor) -> torch.Tensor:
+        """Verify (input, output, proof) triplet."""
+        triplet = torch.cat([x, output, proof], dim=-1)
+        return self.verifier(triplet)
+        
+    def generate_fake(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Generate fake output and proof."""
+        fake_combined = self.generator(x)
+        fake_output = fake_combined[..., :self.num_features]
+        fake_proof = torch.tanh(fake_combined[..., self.num_features:])
+        return fake_output, fake_proof
+
+
+class VerifiableConv2d(VerifiableLayer):
+    """Verifiable Conv2d layer with adversarial training."""
+    
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, 
+                 stride: int = 1, padding: int = 0, proof_dim: int = 32):
+        super(VerifiableConv2d, self).__init__(proof_dim)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.stride = stride
+        self.padding = padding
+        
+        # The actual conv2d computation
+        self.conv2d = nn.Conv2d(in_channels, out_channels, kernel_size, stride, padding)
+        
+        # Initialize as None - will be built dynamically based on input/output shapes
+        self.verifier = None
+        self.generator = None
+        self.proof_gen = None
+        
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Perform Conv2d computation."""
+        return self.conv2d(x)
+        
+    def _build_verifier_generator(self, input_shape: Tuple[int, ...], output_shape: Tuple[int, ...], device: str):
+        """Build verifier and generator networks based on actual tensor shapes."""
+        input_size = torch.prod(torch.tensor(input_shape)).item()
+        output_size = torch.prod(torch.tensor(output_shape)).item()
+        
+        # Verifier: takes (input, output, proof) -> binary classification
+        self.verifier = nn.Sequential(
+            nn.Linear(input_size + output_size + self.proof_dim, 256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1),
+            nn.Sigmoid()
+        ).to(device)
+        
+        # Generator: takes input -> fake output + proof
+        self.generator = nn.Sequential(
+            nn.Linear(input_size, 256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, output_size + self.proof_dim),
+        ).to(device)
+        
+        # Proof generator: takes (input, output) -> proof
+        self.proof_gen = nn.Sequential(
+            nn.Linear(input_size + output_size, 128),
+            nn.ReLU(),
+            nn.Linear(128, self.proof_dim),
+            nn.Tanh()
+        ).to(device)
+        
+    def generate_proof(self, x: torch.Tensor, output: torch.Tensor) -> torch.Tensor:
+        """Generate authentic proof for conv2d computation."""
+        if self.proof_gen is None:
+            self._build_verifier_generator(x.shape[1:], output.shape[1:], x.device)
+            
+        x_flat = x.view(x.shape[0], -1)
+        output_flat = output.view(output.shape[0], -1)
+        combined = torch.cat([x_flat, output_flat], dim=-1)
+        return self.proof_gen(combined)
+        
+    def verify_triplet(self, x: torch.Tensor, output: torch.Tensor, proof: torch.Tensor) -> torch.Tensor:
+        """Verify (input, output, proof) triplet."""
+        if self.verifier is None:
+            self._build_verifier_generator(x.shape[1:], output.shape[1:], x.device)
+            
+        x_flat = x.view(x.shape[0], -1)
+        output_flat = output.view(output.shape[0], -1)
+        triplet = torch.cat([x_flat, output_flat, proof], dim=-1)
+        return self.verifier(triplet)
+        
+    def generate_fake(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Generate fake output and proof."""
+        if self.generator is None:
+            # Need to do a forward pass to determine output shape
+            with torch.no_grad():
+                temp_output = self.forward(x)
+            self._build_verifier_generator(x.shape[1:], temp_output.shape[1:], x.device)
+            
+        x_flat = x.view(x.shape[0], -1)
+        fake_combined = self.generator(x_flat)
+        
+        # Calculate output size from conv2d operation
+        with torch.no_grad():
+            temp_output = self.forward(x[:1])  # Use single sample to get shape
+            output_size = torch.prod(torch.tensor(temp_output.shape[1:])).item()
+            
+        fake_output_flat = fake_combined[..., :output_size]
+        fake_proof = torch.tanh(fake_combined[..., output_size:])
+        
+        # Reshape fake output to match conv2d output shape
+        fake_output = fake_output_flat.view(x.shape[0], *temp_output.shape[1:])
+        
+        return fake_output, fake_proof 
