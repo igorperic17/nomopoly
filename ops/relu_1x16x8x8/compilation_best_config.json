@@ -1,0 +1,34 @@
+{
+  "best_config": {
+    "hidden_layers": [
+      512,
+      1024,
+      512
+    ],
+    "activation": "relu",
+    "dropout_rates": [
+      0.3,
+      0.3,
+      0.3
+    ],
+    "use_batch_norm": false,
+    "use_layer_norm": true,
+    "use_residual": false,
+    "optimizer": "adamw",
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "batch_size": 64,
+    "use_gradient_clipping": true,
+    "gradient_clip_value": 1.131133482174242,
+    "use_label_smoothing": true,
+    "label_smoothing": 0.18734272658502982,
+    "use_mixup": true,
+    "mixup_alpha": 0.3280635016451353,
+    "ensemble_size": 5,
+    "use_ensemble": false
+  },
+  "achieved_accuracy": 1.0,
+  "timestamp": "2025-06-26T14:39:15.401179",
+  "operation": "relu_1x16x8x8",
+  "target_achieved": true
+}

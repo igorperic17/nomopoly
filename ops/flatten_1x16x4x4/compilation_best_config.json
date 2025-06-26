@@ -1,0 +1,32 @@
+{
+  "best_config": {
+    "hidden_layers": [
+      2048,
+      1024
+    ],
+    "activation": "elu",
+    "dropout_rates": [
+      0.2,
+      0.3
+    ],
+    "use_batch_norm": false,
+    "use_layer_norm": true,
+    "use_residual": true,
+    "optimizer": "rmsprop",
+    "learning_rate": 0.0001,
+    "weight_decay": 0.0001,
+    "batch_size": 64,
+    "use_gradient_clipping": false,
+    "gradient_clip_value": 1.3043440110119386,
+    "use_label_smoothing": false,
+    "label_smoothing": 0.0801590407810174,
+    "use_mixup": true,
+    "mixup_alpha": 0.16190225945164693,
+    "ensemble_size": 3,
+    "use_ensemble": false
+  },
+  "achieved_accuracy": 1.0,
+  "timestamp": "2025-06-26T14:39:52.862619",
+  "operation": "flatten_1x16x4x4",
+  "target_achieved": true
+}

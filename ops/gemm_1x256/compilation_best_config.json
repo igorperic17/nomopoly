@@ -1,0 +1,32 @@
+{
+  "best_config": {
+    "hidden_layers": [
+      2048,
+      1024
+    ],
+    "activation": "swish",
+    "dropout_rates": [
+      0.1,
+      0.2
+    ],
+    "use_batch_norm": false,
+    "use_layer_norm": true,
+    "use_residual": true,
+    "optimizer": "adamw",
+    "learning_rate": 5e-06,
+    "weight_decay": 0.0001,
+    "batch_size": 64,
+    "use_gradient_clipping": false,
+    "gradient_clip_value": 1.0178630885799156,
+    "use_label_smoothing": true,
+    "label_smoothing": 0.17243512738897188,
+    "use_mixup": false,
+    "mixup_alpha": 0.2873651385144491,
+    "ensemble_size": 5,
+    "use_ensemble": true
+  },
+  "achieved_accuracy": 1.0,
+  "timestamp": "2025-06-26T14:40:59.890796",
+  "operation": "gemm_1x256",
+  "target_achieved": true
+}

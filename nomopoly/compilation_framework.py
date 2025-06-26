@@ -85,22 +85,24 @@ class ONNXCompilationFramework:
     def compile_uncompiled_operations(
         self,
         num_epochs: int = 200,
-        batch_size: int = 32,
-        proof_dim: int = 32,
+        batch_size: int = 64,
+        proof_dim: int = 64,
         force_recompile: bool = False,
-        target_accuracy: float = 0.99,
-        max_epochs: int = 1000
+        target_accuracy: float = 0.99999,
+        max_epochs: int = 2000,
+        use_nas: bool = True
     ) -> Dict[str, Dict]:
         """
-        Compile all uncompiled operations in the registry.
+        Compile all uncompiled operations in the registry with NAS for ultra-precision.
         
         Args:
             num_epochs: Minimum number of training epochs per operation
             batch_size: Training batch size
             proof_dim: Dimension of proof vectors
             force_recompile: If True, recompile even already compiled operations
-            target_accuracy: Target verifier accuracy (default 99%)
+            target_accuracy: Target verifier accuracy (default 99.999% for 5 nines)
             max_epochs: Maximum number of epochs to prevent infinite training
+            use_nas: If True, use Neural Architecture Search for ultra-precision
             
         Returns:
             Dictionary mapping operation names to compilation results
@@ -125,15 +127,26 @@ class ONNXCompilationFramework:
             start_time = time.time()
             
             try:
-                # Compile the operation
-                result = self.compiler.compile_operation(
-                    op_info=op_info,
-                    num_epochs=num_epochs,
-                    batch_size=batch_size,
-                    proof_dim=proof_dim,
-                    target_accuracy=target_accuracy,
-                    max_epochs=max_epochs
-                )
+                # Use NAS for ultra-precision if requested
+                if use_nas and target_accuracy >= 0.999:
+                    self.logger.info(f"🧬 Using NAS for ultra-precision: {target_accuracy:.5f}")
+                    result = self.compiler.evolve_architecture_to_precision(
+                        op_info=op_info,
+                        target_accuracy=target_accuracy,
+                        max_generations=20,
+                        population_size=10,
+                        proof_dim=proof_dim
+                    )
+                else:
+                    # Standard compilation
+                    result = self.compiler.compile_operation(
+                        op_info=op_info,
+                        num_epochs=num_epochs,
+                        batch_size=batch_size,
+                        proof_dim=proof_dim,
+                        target_accuracy=target_accuracy,
+                        max_epochs=max_epochs
+                    )
                 
                 compilation_time = time.time() - start_time
                 result["compilation_time"] = compilation_time
@@ -142,8 +155,18 @@ class ONNXCompilationFramework:
                 
                 if result["success"]:
                     self.logger.info(f"✅ Successfully compiled {op_info.folder_name} in {compilation_time:.1f}s")
-                    self.logger.info(f"   Final verifier accuracy: {result['final_verifier_accuracy']:.3f}")
-                    self.logger.info(f"   Final adversary fool rate: {result['final_adversary_fool_rate']:.3f}")
+                    
+                    # Handle both standard and NAS results
+                    if 'best_accuracy' in result:
+                        accuracy = result['best_accuracy']
+                        self.logger.info(f"   Best evolved accuracy: {accuracy:.5f}")
+                        if result.get('target_achieved', False):
+                            self.logger.info("   🏆 ULTRA-PRECISION TARGET ACHIEVED!")
+                    else:
+                        accuracy = result.get('final_verifier_accuracy', 0.0)
+                        self.logger.info(f"   Final verifier accuracy: {accuracy:.5f}")
+                        fool_rate = result.get('final_adversary_fool_rate', 0.0)
+                        self.logger.info(f"   Final adversary fool rate: {fool_rate:.5f}")
                 else:
                     self.logger.error(f"❌ Failed to compile {op_info.folder_name}: {result.get('error', 'Unknown error')}")
                     
@@ -170,8 +193,23 @@ class ONNXCompilationFramework:
         self.logger.info(f"   ⏱️  Total time: {total_time:.1f}s")
         
         if successful_compilations:
-            avg_accuracy = sum(r["final_verifier_accuracy"] for r in successful_compilations) / len(successful_compilations)
-            self.logger.info(f"   📈 Average verifier accuracy: {avg_accuracy:.3f}")
+            # Calculate average accuracy from different result formats
+            accuracies = []
+            ultra_precision_count = 0
+            
+            for r in successful_compilations:
+                if 'best_accuracy' in r:
+                    accuracy = r['best_accuracy']
+                    if r.get('target_achieved', False):
+                        ultra_precision_count += 1
+                else:
+                    accuracy = r.get('final_verifier_accuracy', 0.0)
+                accuracies.append(accuracy)
+            
+            if accuracies:
+                avg_accuracy = sum(accuracies) / len(accuracies)
+                self.logger.info(f"   📈 Average accuracy: {avg_accuracy:.5f}")
+                self.logger.info(f"   🏆 Ultra-precision achieved: {ultra_precision_count}/{len(successful_compilations)}")
         
         return compilation_results
     
