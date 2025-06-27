@@ -186,8 +186,8 @@ class ONNXOperationWrapper(nn.Module):
         self.operation = self._create_operation_layer()
         
         # Proof generator for authentic proofs
-        input_size = np.prod(op_info.input_shape)
-        output_size = np.prod(op_info.output_shape)
+        input_size = np.prod(op_info.input_shape[1:])  # Exclude batch dimension
+        output_size = np.prod(op_info.output_shape[1:])  # Exclude batch dimension
         
         self.proof_generator = nn.Sequential(
             nn.Linear(input_size + output_size, 128),
@@ -211,7 +211,7 @@ class ONNXOperationWrapper(nn.Module):
             # Extract Conv2d parameters from attributes
             kernel_shape = attrs.get('kernel_shape', [3, 3])
             strides = attrs.get('strides', [1, 1])
-            pads = attrs.get('pads', [0, 0, 0, 0])
+            pads = attrs.get('pads', [1, 1, 1, 1])  # Default to padding=1 for same size
             
             # Get input/output channels from shapes
             if len(self.op_info.input_shape) == 4:
@@ -221,7 +221,11 @@ class ONNXOperationWrapper(nn.Module):
                 in_channels = 3  # Default
                 out_channels = 32  # Default
             
-            padding = pads[0] if isinstance(pads, list) else pads
+            # Use appropriate padding to match expected output shape
+            if isinstance(pads, list) and len(pads) >= 4:
+                padding = pads[0]  # Use top padding
+            else:
+                padding = pads if isinstance(pads, int) else 1
             
             return nn.Conv2d(
                 in_channels=in_channels,
@@ -297,10 +301,16 @@ class ONNXOperationWrapper(nn.Module):
     
     def generate_proof(self, input_tensor: torch.Tensor, output_tensor: torch.Tensor) -> torch.Tensor:
         """Generate an authentic proof for the operation execution."""
-        input_flat = input_tensor.view(input_tensor.shape[0], -1)
-        output_flat = output_tensor.view(output_tensor.shape[0], -1)
-        combined = torch.cat([input_flat, output_flat], dim=-1)
-        return self.proof_generator(combined)
+        # Check if proof generator is AdvancedProofGenerator (has config attribute) or basic Sequential
+        if hasattr(self.proof_generator, 'config'):
+            # This is an AdvancedProofGenerator - call with input and output tensors
+            return self.proof_generator(input_tensor, output_tensor)
+        else:
+            # This is a basic Sequential proof generator - call with concatenated tensor
+            input_flat = input_tensor.view(input_tensor.shape[0], -1)
+            output_flat = output_tensor.view(output_tensor.shape[0], -1)
+            combined = torch.cat([input_flat, output_flat], dim=-1)
+            return self.proof_generator(combined)
     
     def execute_only(self, x: torch.Tensor) -> torch.Tensor:
         """Execute only the operation (for backward compatibility)."""
@@ -318,8 +328,8 @@ class ONNXVerifier(nn.Module):
         self.op_info = op_info
         self.proof_dim = proof_dim
         
-        input_size = np.prod(op_info.input_shape)
-        output_size = np.prod(op_info.output_shape)
+        input_size = np.prod(op_info.input_shape[1:])  # Exclude batch dimension
+        output_size = np.prod(op_info.output_shape[1:])  # Exclude batch dimension
         total_size = input_size + output_size + proof_dim
         
         self.verifier = nn.Sequential(
@@ -353,8 +363,8 @@ class ONNXAdversary(nn.Module):
         self.op_info = op_info
         self.proof_dim = proof_dim
         
-        input_size = np.prod(op_info.input_shape)
-        output_size = np.prod(op_info.output_shape)
+        input_size = np.prod(op_info.input_shape[1:])  # Exclude batch dimension
+        output_size = np.prod(op_info.output_shape[1:])  # Exclude batch dimension
         
         # Fake output generator
         self.output_generator = nn.Sequential(

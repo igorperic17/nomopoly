@@ -29,6 +29,22 @@ from .compilation_framework import (
     compilation_framework
 )
 
+from .network_compiler import (
+    network_compiler,
+    NetworkCompiler
+)
+
+from .zk_op_compiler import (
+    ZKOp,
+    ZKOpCompiler,
+    zk_op_compiler
+)
+
+from .zk_graph_compiler import (
+    ZKGraph,
+    ZKGraphCompiler
+)
+
 __version__ = "0.4.0"
 __author__ = "Nomopoly Team"
 __description__ = "ONNX Operation Compilation Framework for Zero Knowledge Machine Learning"
@@ -53,6 +69,19 @@ __all__ = [
     # Compilation Framework
     "ONNXCompilationFramework",
     "compilation_framework",
+    
+    # Network Compiler
+    "network_compiler",
+    "NetworkCompiler",
+    
+    # ZK Operation Compiler
+    "ZKOp",
+    "ZKOpCompiler", 
+    "zk_op_compiler",
+    
+    # ZK Graph Compiler
+    "ZKGraph",
+    "ZKGraphCompiler",
     
     # Version info
     "__version__",

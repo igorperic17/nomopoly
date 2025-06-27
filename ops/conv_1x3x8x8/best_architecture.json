@@ -1,0 +1,36 @@
+{
+  "config": {
+    "hidden_layers": [
+      64,
+      32
+    ],
+    "activation": "relu",
+    "dropout_rates": [
+      0.4,
+      0.4
+    ],
+    "use_batch_norm": true,
+    "use_layer_norm": true,
+    "use_residual": true,
+    "proof_dim": 64,
+    "optimizer": "radam",
+    "learning_rate": 0.001,
+    "weight_decay": 0.01,
+    "batch_size": 64,
+    "scheduler": "cyclic",
+    "scheduler_params": {
+      "patience": 50,
+      "factor": 0.5
+    },
+    "use_gradient_clipping": false,
+    "gradient_clip_value": 0.6778777865305616,
+    "use_label_smoothing": true,
+    "label_smoothing": 0.06805331188891323,
+    "use_mixup": true,
+    "mixup_alpha": 0.31927242394211014,
+    "ensemble_size": 1,
+    "use_ensemble": false
+  },
+  "achieved_accuracy": 1.0,
+  "compilation_timestamp": 1750984372.0957482
+}

@@ -1,0 +1,38 @@
+{
+  "config": {
+    "hidden_layers": [
+      512,
+      512,
+      256
+    ],
+    "activation": "swish",
+    "dropout_rates": [
+      0.1,
+      0.1,
+      0.1
+    ],
+    "use_batch_norm": false,
+    "use_layer_norm": true,
+    "use_residual": false,
+    "proof_dim": 128,
+    "optimizer": "radam",
+    "learning_rate": 0.0001,
+    "weight_decay": 0.01,
+    "batch_size": 64,
+    "scheduler": "plateau",
+    "scheduler_params": {
+      "patience": 50,
+      "factor": 0.5
+    },
+    "use_gradient_clipping": true,
+    "gradient_clip_value": 0.5070695043531664,
+    "use_label_smoothing": true,
+    "label_smoothing": 0.05436950019957604,
+    "use_mixup": true,
+    "mixup_alpha": 0.2555829326607181,
+    "ensemble_size": 3,
+    "use_ensemble": true
+  },
+  "achieved_accuracy": 1.0,
+  "compilation_timestamp": 1750984379.467006
+}

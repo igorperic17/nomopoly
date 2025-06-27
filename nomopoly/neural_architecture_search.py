@@ -114,8 +114,9 @@ class AdvancedVerifier(nn.Module):
         self.config = config
         self.op_info = op_info
         
-        input_size = np.prod(op_info.input_shape)
-        output_size = np.prod(op_info.output_shape)
+        # Calculate sizes excluding batch dimension
+        input_size = np.prod(op_info.input_shape[1:])  # Exclude batch dimension
+        output_size = np.prod(op_info.output_shape[1:])  # Exclude batch dimension
         total_size = input_size + output_size + config.proof_dim
         
         # Build the architecture
@@ -224,8 +225,9 @@ class AdvancedProofGenerator(nn.Module):
         super().__init__()
         self.config = config
         
-        input_size = np.prod(op_info.input_shape)
-        output_size = np.prod(op_info.output_shape)
+        # Calculate sizes excluding batch dimension
+        input_size = np.prod(op_info.input_shape[1:])  # Exclude batch dimension
+        output_size = np.prod(op_info.output_shape[1:])  # Exclude batch dimension
         total_size = input_size + output_size
         
         # Build the architecture
@@ -291,8 +293,9 @@ class AdvancedAdversary(nn.Module):
         self.config = config
         self.op_info = op_info
         
-        input_size = np.prod(op_info.input_shape)
-        output_size = np.prod(op_info.output_shape)
+        # Calculate sizes excluding batch dimension
+        input_size = np.prod(op_info.input_shape[1:])  # Exclude batch dimension
+        output_size = np.prod(op_info.output_shape[1:])  # Exclude batch dimension
         
         # Build output generator
         layers = []

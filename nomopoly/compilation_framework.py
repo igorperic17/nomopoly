@@ -89,11 +89,10 @@ class ONNXCompilationFramework:
         proof_dim: int = 64,
         force_recompile: bool = False,
         target_accuracy: float = 0.99999,
-        max_epochs: int = 2000,
-        use_nas: bool = True
+        max_epochs: int = 2000
     ) -> Dict[str, Dict]:
         """
-        Compile all uncompiled operations in the registry with NAS for ultra-precision.
+        Compile all uncompiled operations in the registry using Neural Architecture Search.
         
         Args:
             num_epochs: Minimum number of training epochs per operation
@@ -102,7 +101,6 @@ class ONNXCompilationFramework:
             force_recompile: If True, recompile even already compiled operations
             target_accuracy: Target verifier accuracy (default 99.999% for 5 nines)
             max_epochs: Maximum number of epochs to prevent infinite training
-            use_nas: If True, use Neural Architecture Search for ultra-precision
             
         Returns:
             Dictionary mapping operation names to compilation results
@@ -127,26 +125,15 @@ class ONNXCompilationFramework:
             start_time = time.time()
             
             try:
-                # Use NAS for ultra-precision if requested
-                if use_nas and target_accuracy >= 0.999:
-                    self.logger.info(f"🧬 Using NAS for ultra-precision: {target_accuracy:.5f}")
-                    result = self.compiler.evolve_architecture_to_precision(
-                        op_info=op_info,
-                        target_accuracy=target_accuracy,
-                        max_generations=20,
-                        population_size=10,
-                        proof_dim=proof_dim
-                    )
-                else:
-                    # Standard compilation
-                    result = self.compiler.compile_operation(
-                        op_info=op_info,
-                        num_epochs=num_epochs,
-                        batch_size=batch_size,
-                        proof_dim=proof_dim,
-                        target_accuracy=target_accuracy,
-                        max_epochs=max_epochs
-                    )
+                # Always use NAS for compilation
+                self.logger.info(f"🧬 Using NAS for ultra-precision: {target_accuracy:.5f}")
+                result = self.compiler.evolve_architecture_to_precision(
+                    op_info=op_info,
+                    target_accuracy=target_accuracy,
+                    max_generations=20,
+                    population_size=10,
+                    proof_dim=proof_dim
+                )
                 
                 compilation_time = time.time() - start_time
                 result["compilation_time"] = compilation_time
@@ -220,8 +207,8 @@ class ONNXCompilationFramework:
         batch_size: int = 32,
         proof_dim: int = 32,
         force_recompile: bool = False,
-        target_accuracy: float = 0.99,
-        max_epochs: int = 1000
+        target_accuracy: float = 0.99999,
+        max_epochs: int = 2000
     ) -> Dict[str, Dict]:
         """
         Complete workflow: scan a model and compile all its operations.

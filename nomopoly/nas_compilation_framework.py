@@ -17,7 +17,7 @@ import os
 import time
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import logging
 
 from .ops_registry import ops_registry, OpCompilationInfo, SupportedOp
@@ -55,7 +55,7 @@ class NASCompilationFramework:
         
         # Initialize NAS and compiler
         self.nas = NeuralArchitectureSearch(device=device)
-        self.compiler = ONNXOperationCompiler(device=device)
+        self.compiler = NASEnabledCompiler(device=device)
         
         # Set up logging
         self._setup_logging()
@@ -395,6 +395,12 @@ class NASCompilationFramework:
 class NASEnabledCompiler(ONNXOperationCompiler):
     """ONNX compiler enhanced with NAS capabilities."""
     
+    def __init__(self, device: str = "mps"):
+        """Initialize the NAS-enabled compiler."""
+        super().__init__(device=device)
+        # Set up logger for NAS compilation
+        self.logger = logging.getLogger("NASEnabledCompiler")
+    
     def compile_operation_with_config(
         self,
         op_info: OpCompilationInfo,
@@ -438,7 +444,17 @@ class NASEnabledCompiler(ONNXOperationCompiler):
             
             if result["success"]:
                 # Export the trained models
-                self._export_nas_models(operation_wrapper, verifier, adversary, op_info)
+                self._export_nas_models(operation_wrapper, verifier, adversary, op_info, config)
+                
+                # Generate training plots if metrics are available
+                if "metrics" in result:
+                    self._plot_training_metrics(op_info, result["metrics"])
+                
+                # Generate comprehensive benchmarks
+                self._generate_benchmarks(operation_wrapper, verifier, adversary, op_info, result)
+                
+                # Save compilation metadata
+                self._save_compilation_metadata(op_info, config, result)
             
             return result
             
@@ -456,26 +472,606 @@ class NASEnabledCompiler(ONNXOperationCompiler):
         op_info: OpCompilationInfo, config: ArchitectureConfig,
         target_accuracy: float, max_epochs: int
     ) -> Dict[str, Any]:
-        """Train models with NAS configuration."""
+        """Train models with NAS configuration using full adversarial training."""
         
-        # This would implement the training loop using the NAS configuration
-        # For now, return a placeholder result
+        import torch
+        import torch.optim as optim
+        import torch.nn.functional as F
+        from tqdm import tqdm
+        import time
+        
+        self.logger.info(f"🔧 Starting full training with NAS config: {config.hidden_layers}, {config.activation.value}")
+        self.logger.info(f"🎯 Target accuracy: {target_accuracy:.5f}")
+        self.logger.info(f"📊 Max epochs: {max_epochs}")
+        
+        # Create optimizers based on NAS config
+        if config.optimizer.value == "adam":
+            verifier_optimizer = optim.Adam(verifier.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+            adversary_optimizer = optim.Adam(adversary.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+            prover_optimizer = optim.Adam(operation_wrapper.proof_generator.parameters(), lr=config.learning_rate * 0.5, weight_decay=config.weight_decay)
+        elif config.optimizer.value == "adamw":
+            verifier_optimizer = optim.AdamW(verifier.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+            adversary_optimizer = optim.AdamW(adversary.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+            prover_optimizer = optim.AdamW(operation_wrapper.proof_generator.parameters(), lr=config.learning_rate * 0.5, weight_decay=config.weight_decay)
+        else:
+            verifier_optimizer = optim.Adam(verifier.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+            adversary_optimizer = optim.Adam(adversary.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+            prover_optimizer = optim.Adam(operation_wrapper.proof_generator.parameters(), lr=config.learning_rate * 0.5, weight_decay=config.weight_decay)
+        
+        # Learning rate schedulers
+        verifier_scheduler = optim.lr_scheduler.ReduceLROnPlateau(verifier_optimizer, mode='max', factor=0.8, patience=50, min_lr=1e-6)
+        adversary_scheduler = optim.lr_scheduler.ReduceLROnPlateau(adversary_optimizer, mode='min', factor=0.8, patience=50, min_lr=1e-6)
+        
+        # Training metrics
+        metrics = {
+            "verifier_loss": [],
+            "adversary_loss": [],
+            "prover_loss": [],
+            "verifier_accuracy": [],
+            "adversary_fool_rate": [],
+            "real_accept_rate": [],
+            "fake_reject_rate": [],
+            "learning_rates": {"verifier": [], "adversary": []}
+        }
+        
+        best_accuracy = 0.0
+        patience_counter = 0
+        patience = 150 if target_accuracy >= 0.999 else 100
+        
+        # Progress bar
+        pbar = tqdm(range(max_epochs), desc=f"Training {op_info.folder_name}")
+        
+        start_time = time.time()
+        
+        for epoch in range(max_epochs):
+            epoch_start = time.time()
+            
+            # Generate training data
+            input_data = torch.randn(config.batch_size, *op_info.input_shape[1:]).to(self.device)
+            
+            # === STEP 1: Generate real examples ===
+            with torch.no_grad():
+                real_output, real_proof = operation_wrapper(input_data)
+            
+            # === STEP 2: Generate fake examples ===
+            fake_output, fake_proof = adversary(input_data)
+            
+            # === STEP 3: Train Verifier ===
+            verifier_optimizer.zero_grad()
+            
+            # Real examples (should be accepted)
+            real_scores = verifier(input_data, real_output.detach(), real_proof.detach())
+            real_loss = F.binary_cross_entropy(real_scores, torch.ones_like(real_scores))
+            
+            # Fake examples (should be rejected)
+            fake_scores = verifier(input_data, fake_output.detach(), fake_proof.detach())
+            fake_loss = F.binary_cross_entropy(fake_scores, torch.zeros_like(fake_scores))
+            
+            # Mixed examples for robustness
+            mixed_scores1 = verifier(input_data, real_output.detach(), fake_proof.detach())
+            mixed_loss1 = F.binary_cross_entropy(mixed_scores1, torch.zeros_like(mixed_scores1))
+            
+            mixed_scores2 = verifier(input_data, fake_output.detach(), real_proof.detach())
+            mixed_loss2 = F.binary_cross_entropy(mixed_scores2, torch.zeros_like(mixed_scores2))
+            
+            verifier_loss = real_loss + fake_loss + 0.5 * (mixed_loss1 + mixed_loss2)
+            verifier_loss.backward()
+            
+            # Gradient clipping if enabled
+            if config.use_gradient_clipping:
+                torch.nn.utils.clip_grad_norm_(verifier.parameters(), config.gradient_clip_value)
+            
+            verifier_optimizer.step()
+            
+            # === STEP 4: Train Adversary ===
+            adversary_optimizer.zero_grad()
+            
+            adv_fake_output, adv_fake_proof = adversary(input_data)
+            adv_scores = verifier(input_data, adv_fake_output, adv_fake_proof)
+            adversary_loss = F.binary_cross_entropy(adv_scores, torch.ones_like(adv_scores))
+            adversary_loss.backward()
+            
+            if config.use_gradient_clipping:
+                torch.nn.utils.clip_grad_norm_(adversary.parameters(), config.gradient_clip_value)
+            
+            adversary_optimizer.step()
+            
+            # === STEP 5: Train Prover Proof Generator ===
+            prover_optimizer.zero_grad()
+            
+            fresh_real_output, fresh_real_proof = operation_wrapper(input_data)
+            prover_scores = verifier(input_data, fresh_real_output.detach(), fresh_real_proof)
+            prover_loss = F.binary_cross_entropy(prover_scores, torch.ones_like(prover_scores))
+            prover_loss.backward()
+            
+            if config.use_gradient_clipping:
+                torch.nn.utils.clip_grad_norm_(operation_wrapper.proof_generator.parameters(), config.gradient_clip_value)
+            
+            prover_optimizer.step()
+            
+            # === STEP 6: Calculate metrics ===
+            with torch.no_grad():
+                # Recalculate for clean metrics
+                eval_real_scores = verifier(input_data, real_output, real_proof)
+                eval_fake_scores = verifier(input_data, fake_output, fake_proof)
+                
+                real_accept_rate = (eval_real_scores > 0.5).float().mean().item()
+                fake_reject_rate = (eval_fake_scores < 0.5).float().mean().item()
+                verifier_accuracy = (real_accept_rate + fake_reject_rate) / 2
+                fool_rate = (adv_scores > 0.5).float().mean().item()
+                
+                # Store metrics
+                metrics["verifier_loss"].append(verifier_loss.item())
+                metrics["adversary_loss"].append(adversary_loss.item())
+                metrics["prover_loss"].append(prover_loss.item())
+                metrics["verifier_accuracy"].append(verifier_accuracy)
+                metrics["adversary_fool_rate"].append(fool_rate)
+                metrics["real_accept_rate"].append(real_accept_rate)
+                metrics["fake_reject_rate"].append(fake_reject_rate)
+                metrics["learning_rates"]["verifier"].append(verifier_optimizer.param_groups[0]['lr'])
+                metrics["learning_rates"]["adversary"].append(adversary_optimizer.param_groups[0]['lr'])
+            
+            # Update progress bar
+            pbar.set_postfix({
+                'Acc': f"{verifier_accuracy:.4f}",
+                'Target': f"{target_accuracy:.4f}",
+                'Best': f"{best_accuracy:.4f}",
+                'Real': f"{real_accept_rate:.3f}",
+                'Fake': f"{fake_reject_rate:.3f}"
+            })
+            pbar.update(1)
+            
+            # Check for improvement
+            if verifier_accuracy > best_accuracy:
+                best_accuracy = verifier_accuracy
+                patience_counter = 0
+            else:
+                patience_counter += 1
+            
+            # Update learning rate schedulers
+            verifier_scheduler.step(verifier_accuracy)
+            adversary_scheduler.step(adversary_loss.item())
+            
+            # Early stopping
+            if patience_counter >= patience:
+                self.logger.info(f"⏹️ Early stopping after {patience} epochs without improvement")
+                break
+            
+            # Check for target accuracy
+            if verifier_accuracy >= target_accuracy:
+                self.logger.info(f"🎯 Target accuracy achieved: {verifier_accuracy:.5f} >= {target_accuracy:.5f}")
+                break
+        
+        pbar.close()
+        
+        total_time = time.time() - start_time
+        
+        # Final evaluation with larger batch
+        self.logger.info("🔍 Final evaluation with larger batch...")
+        with torch.no_grad():
+            eval_batch_size = min(512, config.batch_size * 4)
+            eval_input = torch.randn(eval_batch_size, *op_info.input_shape[1:]).to(self.device)
+            
+            eval_real_output, eval_real_proof = operation_wrapper(eval_input)
+            eval_fake_output, eval_fake_proof = adversary(eval_input)
+            
+            eval_real_scores = verifier(eval_input, eval_real_output, eval_real_proof)
+            eval_fake_scores = verifier(eval_input, eval_fake_output, eval_fake_proof)
+            
+            final_real_accept = (eval_real_scores > 0.5).float().mean().item()
+            final_fake_reject = (eval_fake_scores < 0.5).float().mean().item()
+            final_accuracy = (final_real_accept + final_fake_reject) / 2
+            final_fool_rate = (eval_fake_scores > 0.5).float().mean().item()
+        
+        self.logger.info(f"✅ Training completed in {total_time:.1f}s")
+        self.logger.info(f"📊 Final accuracy: {final_accuracy:.5f}")
+        self.logger.info(f"📊 Real accept rate: {final_real_accept:.5f}")
+        self.logger.info(f"📊 Fake reject rate: {final_fake_reject:.5f}")
+        self.logger.info(f"📊 Adversary fool rate: {final_fool_rate:.5f}")
+        
         return {
             "success": True,
-            "final_verifier_accuracy": target_accuracy,
-            "final_adversary_fool_rate": 0.1,
-            "epochs_trained": max_epochs
+            "final_verifier_accuracy": final_accuracy,
+            "final_adversary_fool_rate": final_fool_rate,
+            "final_real_accept_rate": final_real_accept,
+            "final_fake_reject_rate": final_fake_reject,
+            "epochs_trained": epoch + 1,
+            "training_time": total_time,
+            "metrics": metrics,
+            "target_achieved": final_accuracy >= target_accuracy
         }
     
-    def _export_nas_models(self, operation_wrapper, verifier, adversary, op_info: OpCompilationInfo):
+    def _export_nas_models(self, operation_wrapper, verifier, adversary, op_info: OpCompilationInfo, config: ArchitectureConfig):
         """Export NAS-trained models to ONNX."""
+        
+        import torch
+        from pathlib import Path
         
         # Create output directory
         output_dir = Path("ops") / op_info.folder_name
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Export placeholder files (actual implementation would export real ONNX)
+        # Move models to CPU for ONNX export and validation
+        operation_wrapper_cpu = operation_wrapper.cpu()
+        verifier_cpu = verifier.cpu()
+        adversary_cpu = adversary.cpu()
+        
+        # Create dummy inputs for ONNX export (ensure they're on CPU for ONNX export)
+        dummy_input = torch.randn(1, *op_info.input_shape[1:])
+        dummy_output = torch.randn(1, *op_info.output_shape[1:])
+        
+        # Calculate actual proof dimension from the configuration
+        proof_dim = config.proof_dim
+        
+        # Validate that the operation wrapper produces the expected proof dimension
+        with torch.no_grad():
+            operation_wrapper_cpu.eval()
+            test_output, test_proof = operation_wrapper_cpu(dummy_input)
+            actual_proof_dim = test_proof.shape[-1]
+            
+            if actual_proof_dim != proof_dim:
+                self.logger.warning(f"Prover proof dimension mismatch: expected {proof_dim}, got {actual_proof_dim}")
+                proof_dim = actual_proof_dim
+            
+            # Also validate adversary proof dimension
+            adversary_cpu.eval()
+            _, adv_test_proof = adversary_cpu(dummy_input)
+            adv_proof_dim = adv_test_proof.shape[-1]
+            
+            if adv_proof_dim != proof_dim:
+                self.logger.warning(f"Adversary proof dimension mismatch: expected {proof_dim}, got {adv_proof_dim}")
+                # Use the prover's proof dimension as the reference
+                self.logger.info(f"Using prover proof dimension: {proof_dim}")
+            
+            # Validate output dimensions match expected
+            expected_output_shape = op_info.output_shape[1:]  # Exclude batch dimension
+            actual_output_shape = test_output.shape[1:]  # Exclude batch dimension
+            
+            if actual_output_shape != expected_output_shape:
+                self.logger.warning(f"Output shape mismatch: expected {expected_output_shape}, got {actual_output_shape}")
+                # Update op_info with actual shape
+                op_info.output_shape = (1,) + actual_output_shape
+                dummy_output = test_output[:1]  # Use actual output for export
+            
+            self.logger.info(f"Validated dimensions - Input: {op_info.input_shape}, Output: {op_info.output_shape}, Proof: {proof_dim}D")
+        
+        dummy_proof = torch.randn(1, proof_dim)
+        
+        # Export prover (operation wrapper)
+        prover_path = output_dir / f"{op_info.folder_name}_prover.onnx"
+        operation_wrapper_cpu.eval()
+        torch.onnx.export(
+            operation_wrapper_cpu,
+            dummy_input,
+            str(prover_path),
+            export_params=True,
+            opset_version=17,
+            input_names=['input'],
+            output_names=['output', 'proof'],
+            dynamic_axes={
+                'input': {0: 'batch_size'},
+                'output': {0: 'batch_size'},
+                'proof': {0: 'batch_size'}
+            }
+        )
+        
+        # Export verifier
+        verifier_path = output_dir / f"{op_info.folder_name}_verifier.onnx"
+        verifier_cpu.eval()
+        torch.onnx.export(
+            verifier_cpu,
+            (dummy_input, dummy_output, dummy_proof),
+            str(verifier_path),
+            export_params=True,
+            opset_version=17,
+            input_names=['input', 'output', 'proof'],
+            output_names=['score'],
+            dynamic_axes={
+                'input': {0: 'batch_size'},
+                'output': {0: 'batch_size'},
+                'proof': {0: 'batch_size'},
+                'score': {0: 'batch_size'}
+            }
+        )
+        
+        # Export adversary
+        adversary_path = output_dir / f"{op_info.folder_name}_adversary.onnx"
+        adversary_cpu.eval()
+        torch.onnx.export(
+            adversary_cpu,
+            dummy_input,
+            str(adversary_path),
+            export_params=True,
+            opset_version=17,
+            input_names=['input'],
+            output_names=['fake_output', 'fake_proof'],
+            dynamic_axes={
+                'input': {0: 'batch_size'},
+                'fake_output': {0: 'batch_size'},
+                'fake_proof': {0: 'batch_size'}
+            }
+        )
+        
+        # Update op_info with paths
+        op_info.prover_onnx_path = str(prover_path)
+        op_info.verifier_onnx_path = str(verifier_path)
+        op_info.adversary_onnx_path = str(adversary_path)
+        op_info.is_compiled = True
+        
         self.logger.info(f"📦 Exported NAS models to {output_dir}")
+        self.logger.info(f"   Prover: {prover_path}")
+        self.logger.info(f"   Verifier: {verifier_path}")
+        self.logger.info(f"   Adversary: {adversary_path}")
+    
+    def _plot_training_metrics(self, op_info: OpCompilationInfo, metrics: Dict[str, list]):
+        """Generate training plots for the compiled operation."""
+        try:
+            import matplotlib.pyplot as plt
+            
+            # Create plots directory
+            plots_dir = Path("ops") / op_info.folder_name / "plots"
+            plots_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Create subplots
+            fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+            fig.suptitle(f'Training Metrics: {op_info.folder_name}', fontsize=16)
+            
+            epochs = range(len(metrics["verifier_accuracy"]))
+            
+            # Verifier Accuracy
+            ax1.plot(epochs, metrics["verifier_accuracy"], 'b-', linewidth=2, label='Verifier Accuracy')
+            ax1.axhline(y=0.99999, color='r', linestyle='--', alpha=0.7, label='Target (99.999%)')
+            ax1.set_title('Verifier Accuracy Over Time')
+            ax1.set_xlabel('Epoch')
+            ax1.set_ylabel('Accuracy')
+            ax1.legend()
+            ax1.grid(True, alpha=0.3)
+            ax1.set_ylim(0, 1.05)
+            
+            # Verifier Loss
+            ax2.plot(epochs, metrics["verifier_loss"], 'g-', linewidth=2, label='Verifier Loss')
+            ax2.set_title('Verifier Loss Over Time')
+            ax2.set_xlabel('Epoch')
+            ax2.set_ylabel('Loss')
+            ax2.legend()
+            ax2.grid(True, alpha=0.3)
+            
+            # Adversary Loss
+            ax3.plot(epochs, metrics["adversary_loss"], 'r-', linewidth=2, label='Adversary Loss')
+            ax3.set_title('Adversary Loss Over Time')
+            ax3.set_xlabel('Epoch')
+            ax3.set_ylabel('Loss')
+            ax3.legend()
+            ax3.grid(True, alpha=0.3)
+            
+            # Adversary Fool Rate
+            ax4.plot(epochs, metrics["adversary_fool_rate"], 'm-', linewidth=2, label='Adversary Fool Rate')
+            ax4.set_title('Adversary Fool Rate Over Time')
+            ax4.set_xlabel('Epoch')
+            ax4.set_ylabel('Fool Rate')
+            ax4.legend()
+            ax4.grid(True, alpha=0.3)
+            ax4.set_ylim(0, 1.05)
+            
+            plt.tight_layout()
+            
+            # Save the plot
+            plot_path = plots_dir / f"{op_info.folder_name}_training_metrics.png"
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            plt.close()
+            
+            self.logger.info(f"📊 Training plots saved to {plot_path}")
+            
+        except ImportError:
+            self.logger.warning("matplotlib not available, skipping plots")
+        except Exception as e:
+            self.logger.error(f"Failed to generate plots: {e}")
+    
+    def _generate_benchmarks(self, operation_wrapper, verifier, adversary, op_info: OpCompilationInfo, result: Dict):
+        """Generate comprehensive benchmarks for the compiled operation."""
+        try:
+            import torch
+            import time
+            import json
+            from pathlib import Path
+            
+            self.logger.info(f"🔬 Generating benchmarks for {op_info.folder_name}")
+            
+            # Create benchmarks directory
+            benchmarks_dir = Path("ops") / op_info.folder_name / "benchmarks"
+            benchmarks_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Benchmark parameters
+            test_batch_sizes = [1, 4, 16, 64]
+            num_runs = 10
+            
+            benchmark_results = {
+                "operation": op_info.folder_name,
+                "input_shape": op_info.input_shape,
+                "output_shape": op_info.output_shape,
+                "timestamp": time.time(),
+                "training_results": {
+                    "final_accuracy": result["final_verifier_accuracy"],
+                    "training_time": result["training_time"],
+                    "epochs_trained": result["epochs_trained"],
+                    "target_achieved": result["target_achieved"]
+                },
+                "performance_benchmarks": {},
+                "accuracy_benchmarks": {}
+            }
+            
+            # Move models back to original device for benchmarking
+            operation_wrapper = operation_wrapper.to(self.device)
+            verifier = verifier.to(self.device)
+            adversary = adversary.to(self.device)
+            
+            operation_wrapper.eval()
+            verifier.eval()
+            adversary.eval()
+            
+            with torch.no_grad():
+                for batch_size in test_batch_sizes:
+                    self.logger.info(f"  📊 Benchmarking batch size {batch_size}")
+                    
+                    # Generate test data
+                    test_input = torch.randn(batch_size, *op_info.input_shape[1:]).to(self.device)
+                    
+                    # Benchmark prover performance
+                    prover_times = []
+                    for _ in range(num_runs):
+                        start_time = time.time()
+                        real_output, real_proof = operation_wrapper(test_input)
+                        torch.cuda.synchronize() if self.device == "cuda" else None
+                        prover_times.append(time.time() - start_time)
+                    
+                    # Benchmark verifier performance
+                    verifier_times = []
+                    for _ in range(num_runs):
+                        start_time = time.time()
+                        scores = verifier(test_input, real_output, real_proof)
+                        torch.cuda.synchronize() if self.device == "cuda" else None
+                        verifier_times.append(time.time() - start_time)
+                    
+                    # Benchmark adversary performance
+                    adversary_times = []
+                    for _ in range(num_runs):
+                        start_time = time.time()
+                        fake_output, fake_proof = adversary(test_input)
+                        torch.cuda.synchronize() if self.device == "cuda" else None
+                        adversary_times.append(time.time() - start_time)
+                    
+                    # Performance metrics
+                    benchmark_results["performance_benchmarks"][f"batch_{batch_size}"] = {
+                        "prover": {
+                            "mean_time": float(torch.tensor(prover_times).mean()),
+                            "std_time": float(torch.tensor(prover_times).std()),
+                            "throughput": batch_size / float(torch.tensor(prover_times).mean())
+                        },
+                        "verifier": {
+                            "mean_time": float(torch.tensor(verifier_times).mean()),
+                            "std_time": float(torch.tensor(verifier_times).std()),
+                            "throughput": batch_size / float(torch.tensor(verifier_times).mean())
+                        },
+                        "adversary": {
+                            "mean_time": float(torch.tensor(adversary_times).mean()),
+                            "std_time": float(torch.tensor(adversary_times).std()),
+                            "throughput": batch_size / float(torch.tensor(adversary_times).mean())
+                        }
+                    }
+                    
+                    # Accuracy benchmarks
+                    large_test_input = torch.randn(256, *op_info.input_shape[1:]).to(self.device)
+                    
+                    # Real examples
+                    real_output_large, real_proof_large = operation_wrapper(large_test_input)
+                    real_scores = verifier(large_test_input, real_output_large, real_proof_large)
+                    
+                    # Fake examples
+                    fake_output_large, fake_proof_large = adversary(large_test_input)
+                    fake_scores = verifier(large_test_input, fake_output_large, fake_proof_large)
+                    
+                    # Mixed examples (real output + fake proof)
+                    mixed_scores1 = verifier(large_test_input, real_output_large, fake_proof_large)
+                    
+                    # Mixed examples (fake output + real proof)
+                    mixed_scores2 = verifier(large_test_input, fake_output_large, real_proof_large)
+                    
+                    benchmark_results["accuracy_benchmarks"][f"batch_{batch_size}"] = {
+                        "real_accept_rate": float((real_scores > 0.5).float().mean()),
+                        "fake_reject_rate": float((fake_scores < 0.5).float().mean()),
+                        "mixed_reject_rate_1": float((mixed_scores1 < 0.5).float().mean()),
+                        "mixed_reject_rate_2": float((mixed_scores2 < 0.5).float().mean()),
+                        "overall_accuracy": float(((real_scores > 0.5).float().mean() + (fake_scores < 0.5).float().mean()) / 2),
+                        "adversary_fool_rate": float((fake_scores > 0.5).float().mean())
+                    }
+            
+            # Save benchmark results
+            benchmark_path = benchmarks_dir / f"{op_info.folder_name}_benchmarks.json"
+            with open(benchmark_path, 'w') as f:
+                json.dump(benchmark_results, f, indent=2)
+            
+            # Generate benchmark summary
+            summary_path = benchmarks_dir / f"{op_info.folder_name}_benchmark_summary.txt"
+            with open(summary_path, 'w') as f:
+                f.write(f"BENCHMARK SUMMARY: {op_info.folder_name}\n")
+                f.write("=" * 50 + "\n\n")
+                
+                f.write(f"Training Results:\n")
+                f.write(f"  Final Accuracy: {result['final_verifier_accuracy']:.6f}\n")
+                f.write(f"  Training Time: {result['training_time']:.1f}s\n")
+                f.write(f"  Epochs Trained: {result['epochs_trained']}\n")
+                f.write(f"  Target Achieved: {result['target_achieved']}\n\n")
+                
+                f.write("Performance Benchmarks (per sample):\n")
+                for batch_size in test_batch_sizes:
+                    perf = benchmark_results["performance_benchmarks"][f"batch_{batch_size}"]
+                    f.write(f"  Batch {batch_size}:\n")
+                    f.write(f"    Prover: {perf['prover']['mean_time']*1000/batch_size:.2f}ms ± {perf['prover']['std_time']*1000/batch_size:.2f}ms\n")
+                    f.write(f"    Verifier: {perf['verifier']['mean_time']*1000/batch_size:.2f}ms ± {perf['verifier']['std_time']*1000/batch_size:.2f}ms\n")
+                    f.write(f"    Adversary: {perf['adversary']['mean_time']*1000/batch_size:.2f}ms ± {perf['adversary']['std_time']*1000/batch_size:.2f}ms\n")
+                
+                f.write("\nAccuracy Benchmarks:\n")
+                for batch_size in test_batch_sizes:
+                    acc = benchmark_results["accuracy_benchmarks"][f"batch_{batch_size}"]
+                    f.write(f"  Batch {batch_size}:\n")
+                    f.write(f"    Real Accept Rate: {acc['real_accept_rate']:.6f}\n")
+                    f.write(f"    Fake Reject Rate: {acc['fake_reject_rate']:.6f}\n")
+                    f.write(f"    Overall Accuracy: {acc['overall_accuracy']:.6f}\n")
+                    f.write(f"    Adversary Fool Rate: {acc['adversary_fool_rate']:.6f}\n")
+            
+            self.logger.info(f"📊 Benchmarks saved to {benchmarks_dir}")
+            self.logger.info(f"  Detailed results: {benchmark_path}")
+            self.logger.info(f"  Summary: {summary_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to generate benchmarks: {e}")
+            import traceback
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    def _save_compilation_metadata(self, op_info: OpCompilationInfo, config: ArchitectureConfig, result: Dict):
+        """Save comprehensive compilation metadata."""
+        try:
+            import json
+            import time
+            from pathlib import Path
+            
+            # Create metadata directory
+            metadata_dir = Path("ops") / op_info.folder_name / "metadata"
+            metadata_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Compilation metadata
+            metadata = {
+                "operation_info": {
+                    "folder_name": op_info.folder_name,
+                    "operation_type": getattr(op_info, 'operation_type', op_info.op_type.value),
+                    "input_shape": op_info.input_shape,
+                    "output_shape": op_info.output_shape,
+                    "is_compiled": op_info.is_compiled
+                },
+                "architecture_config": config.to_dict(),
+                "compilation_results": result,
+                "compilation_timestamp": time.time(),
+                "file_paths": {
+                    "prover_onnx": getattr(op_info, 'prover_onnx_path', None),
+                    "verifier_onnx": getattr(op_info, 'verifier_onnx_path', None),
+                    "adversary_onnx": getattr(op_info, 'adversary_onnx_path', None)
+                },
+                "system_info": {
+                    "device": self.device,
+                    "target_accuracy": self.target_accuracy,
+                    "framework_version": "1.0.0"
+                }
+            }
+            
+            # Save metadata
+            metadata_path = metadata_dir / f"{op_info.folder_name}_metadata.json"
+            with open(metadata_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            
+            self.logger.info(f"📋 Compilation metadata saved to {metadata_path}")
+            
+        except Exception as e:
+            self.logger.error(f"Failed to save compilation metadata: {e}")
 
 # Monkey patch the enhanced compiler into the NAS framework
 NASCompilationFramework.compiler_class = NASEnabledCompiler 
