@@ -45,6 +45,18 @@ from .zk_graph_compiler import (
     ZKGraphCompiler
 )
 
+from .nas_compilation_framework import NASCompilationFramework
+from .neural_architecture_search import NeuralArchitectureSearch
+from .huggingface_loader import HuggingFaceModelLoader
+from .pytorch_graph_compiler import (
+    PyTorchOp,
+    PyTorchZKOp,
+    PyTorchZKGraph,
+    PyTorchGraphExtractor,
+    PyTorchZKCompiler,
+    ZKProver
+)
+
 __version__ = "0.4.0"
 __author__ = "Nomopoly Team"
 __description__ = "ONNX Operation Compilation Framework for Zero Knowledge Machine Learning"
@@ -82,6 +94,23 @@ __all__ = [
     # ZK Graph Compiler
     "ZKGraph",
     "ZKGraphCompiler",
+    
+    # NAS Compilation Framework
+    "NASCompilationFramework",
+    
+    # Neural Architecture Search
+    "NeuralArchitectureSearch",
+    
+    # HuggingFace Model Loader
+    "HuggingFaceModelLoader",
+    
+    # PyTorch Graph Compiler
+    "PyTorchOp",
+    "PyTorchZKOp",
+    "PyTorchZKGraph",
+    "PyTorchGraphExtractor",
+    "PyTorchZKCompiler",
+    "ZKProver",
     
     # Version info
     "__version__",
